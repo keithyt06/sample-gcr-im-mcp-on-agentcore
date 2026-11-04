@@ -4,7 +4,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
-import { ENV, H, IMS, type Im } from '../../shared/contract';
+import { CONTROL_METHODS, ENV, H, IMS, type Im } from '../../shared/contract';
 import { getContainerAdapter, type AdapterDeps } from './adapters/index';
 import type { ContainerAdapter } from './adapters/types';
 import { loadCatalog } from './catalog';
@@ -103,9 +103,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
       const v = req.headers[n.toLowerCase()];
       return (Array.isArray(v) ? v[0] : v) || undefined;
     };
+    const userId = hdr(H.userId);
+    // tools/call and control RPCs act for one user: never fall back to a shared identity (review L-10).
+    if (!userId && (msg.method === 'tools/call' || (CONTROL_METHODS as readonly string[]).includes(msg.method ?? ''))) {
+      return sse(res, { jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: `Missing ${H.userId} header` } });
+    }
     try {
       const out = await handleRpc(m, msg, {
-        userId: hdr(H.userId) ?? 'anonymous',
+        userId: userId ?? '',
         userToken: hdr(H.userToken),
         authorizeUrl: hdr(H.authorizeUrl),
         requestId: hdr(H.requestId) ?? '',

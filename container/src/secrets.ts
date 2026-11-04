@@ -41,7 +41,7 @@ export function createSecrets(o: { region?: string; kmsKeyId?: string; client?: 
         const r = await sm().send(new GetSecretValueCommand({ SecretId: name }));
         return JSON.parse(r.SecretString ?? 'null') as Record<string, unknown> | null;
       } catch (e) {
-        if ((e as Error).name === 'ResourceNotFoundException') return null;
+        if (isGone(e)) return null;
         throw e;
       }
     },
@@ -62,4 +62,10 @@ export function createSecrets(o: { region?: string; kmsKeyId?: string; client?: 
       }
     },
   };
+}
+
+/** Missing, or scheduled for deletion (slot replaced / revoked): both mean "no credential" (review L-3). */
+export function isGone(e: unknown): boolean {
+  const err = e as Error;
+  return err?.name === 'ResourceNotFoundException' || (err?.name === 'InvalidRequestException' && /deletion|deleted/i.test(err.message ?? ''));
 }

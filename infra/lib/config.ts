@@ -34,6 +34,9 @@ const BaseSchema = z
             burst: z.number().int().min(1).max(5000).default(100),
             registerRps: z.number().int().min(1).max(100).default(5),
             registerBurst: z.number().int().min(1).max(200).default(10),
+            // GET /authorize starts an IM login (and, for wecom, a QR session in a new microVM): keep it tight.
+            authorizeRps: z.number().int().min(1).max(100).default(2),
+            authorizeBurst: z.number().int().min(1).max(200).default(5),
           })
           .strict()
           .prefault({}),
@@ -74,7 +77,17 @@ const BaseSchema = z
         feishu: z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]{8,32}$/), scopes: z.array(scope).max(300).optional() }).strict().optional(),
         lark: z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]{8,32}$/), scopes: z.array(scope).max(300).optional() }).strict().optional(),
         dingtalk: z.object({ clientId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/), scopes: z.array(scope).max(50).optional() }).strict().optional(),
-        wecom: z.object({}).strict().optional(),
+        wecom: z
+          .object({
+            // Cap on concurrent pending QR logins (each holds a runtime session for up to 300 s).
+            maxPendingQr: z.number().int().min(1).max(500).default(20),
+            // New WeCom users stay pending until an operator runs `npm run users -- approve <userId>`.
+            // WeCom QR login has no tenant boundary (anyone with a WeCom account can scan), so turn this on
+            // unless every QR link is sent only to trusted people.
+            requireApproval: z.boolean().default(false),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
   })
@@ -126,6 +139,8 @@ export const ConfigSchema = BaseSchema.superRefine((c, ctx) => {
   if (rl.burst < rl.rps) issue(['ingress', 'rateLimit', 'burst'], 'ingress.rateLimit.burst must be >= ingress.rateLimit.rps');
   if (rl.registerBurst < rl.registerRps) issue(['ingress', 'rateLimit', 'registerBurst'], 'ingress.rateLimit.registerBurst must be >= registerRps');
   if (rl.registerRps > rl.rps) issue(['ingress', 'rateLimit', 'registerRps'], 'ingress.rateLimit.registerRps must be <= rps');
+  if (rl.authorizeBurst < rl.authorizeRps) issue(['ingress', 'rateLimit', 'authorizeBurst'], 'ingress.rateLimit.authorizeBurst must be >= authorizeRps');
+  if (rl.authorizeRps > rl.rps) issue(['ingress', 'rateLimit', 'authorizeRps'], 'ingress.rateLimit.authorizeRps must be <= rps');
   // Rule 10.
   if (effectiveMirrorOf(c.build.mirror, isChina) === 'cn' && !isChina && !c.build.baseImage)
     issue(

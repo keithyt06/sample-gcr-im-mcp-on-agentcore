@@ -115,7 +115,7 @@ describe.each([...COMBOS, ...VARIANTS])('synth %s', (name) => {
     expect(r.AgentRuntimeArtifact.ContainerConfiguration.ContainerUri).toBeDefined();
   });
 
-  it('HTTP API: all routes at the $default stage with throttling and /register override', () => {
+  it('HTTP API: all routes at the $default stage with throttling and /register + /authorize overrides', () => {
     const routes = Object.values(resourcesOf(s.json, 'AWS::ApiGatewayV2::Route')).map((r) => r.Properties.RouteKey);
     expect(routes.sort()).toEqual([...EXPECTED_ROUTES].sort());
     const stage = one(s.json, 'AWS::ApiGatewayV2::Stage');
@@ -123,6 +123,7 @@ describe.each([...COMBOS, ...VARIANTS])('synth %s', (name) => {
     expect(stage.props.StageName).toBe('$default');
     expect(stage.props.DefaultRouteSettings).toMatchObject({ ThrottlingRateLimit: rl.rps, ThrottlingBurstLimit: rl.burst });
     expect(stage.props.RouteSettings['POST /register']).toEqual({ ThrottlingRateLimit: rl.registerRps, ThrottlingBurstLimit: rl.registerBurst });
+    expect(stage.props.RouteSettings['GET /authorize']).toEqual({ ThrottlingRateLimit: rl.authorizeRps, ThrottlingBurstLimit: rl.authorizeBurst });
     expect(stage.props.AccessLogSettings.DestinationArn).toBeDefined();
     // RouteSettings refers to route keys: the stage must depend on every route.
     const routeIds = Object.keys(resourcesOf(s.json, 'AWS::ApiGatewayV2::Route'));
@@ -152,6 +153,16 @@ describe.each([...COMBOS, ...VARIANTS])('synth %s', (name) => {
     expect(acts.includes('secretsmanager:PutSecretValue')).toBe(s.cfg.im === 'wecom');
     expect(acts.includes('secretsmanager:CreateSecret')).toBe(s.cfg.im === 'wecom');
     expect(acts.includes('ecr:GetAuthorizationToken')).toBe(true);
+  });
+
+  it('oauth Lambda gets the wecom QR guards iff wecom', () => {
+    const oauth = Object.values(resourcesOf(s.json, 'AWS::Lambda::Function')).find((r) => r.Properties.FunctionName.endsWith('-oauth'))!;
+    const env = oauth.Properties.Environment.Variables;
+    expect('WECOM_MAX_PENDING_QR' in env).toBe(s.cfg.im === 'wecom');
+    expect('WECOM_REQUIRE_APPROVAL' in env).toBe(s.cfg.im === 'wecom');
+    if (s.cfg.im === 'wecom') expect(env.WECOM_MAX_PENDING_QR).toBe(String(s.cfg.imConfig.wecom?.maxPendingQr ?? 20));
+    if (s.cfg.im === 'wecom') expect(env.WECOM_REQUIRE_APPROVAL).toBe(s.cfg.imConfig.wecom?.requireApproval ? 'true' : 'false');
+    expect('AWS_REGION' in env).toBe(false); // reserved by Lambda
   });
 
   it('Lambdas: Node 22 arm64, own role, explicit log group', () => {

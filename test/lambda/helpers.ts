@@ -59,9 +59,11 @@ const notFound = () => new ResourceNotFoundException({ message: 'Secrets Manager
 const pendingDeletion = () =>
   new InvalidRequestException({ message: 'You can not perform this operation on a secret that is scheduled for deletion.', $metadata: {} });
 
-function evalCondition(cond: string | undefined, item: Item | undefined): boolean {
+function evalCondition(cond: string | undefined, item: Item | undefined, values?: Item): boolean {
   if (!cond) return true;
   return cond.split(' AND ').every((c) => {
+    const eq = /^(\w+) = (:\w+)$/.exec(c.trim());
+    if (eq) return !!item && item[eq[1]!]?.N === values?.[eq[2]!]?.N;
     const m = /^attribute_(not_)?exists\((\w+)\)$/.exec(c.trim());
     if (!m) throw new Error(`unsupported condition ${c}`);
     const has = !!item && m[2]! in item;
@@ -76,9 +78,9 @@ export function installFakes(): void {
   smMock.reset();
   ssmMock.reset();
 
-  ddbMock.on(PutItemCommand).callsFake((i: { Item: Item; ConditionExpression?: string }) => {
+  ddbMock.on(PutItemCommand).callsFake((i: { Item: Item; ConditionExpression?: string; ExpressionAttributeValues?: Item }) => {
     const pk = i.Item.pk!.S!;
-    if (!evalCondition(i.ConditionExpression, table.get(pk))) throw new ConditionalCheckFailedException({ message: 'cond', $metadata: {} });
+    if (!evalCondition(i.ConditionExpression, table.get(pk), i.ExpressionAttributeValues)) throw new ConditionalCheckFailedException({ message: 'cond', $metadata: {} });
     table.set(pk, structuredClone(i.Item));
     return {};
   });
@@ -100,7 +102,7 @@ export function installFakes(): void {
     }) => {
       const pk = i.Key.pk!.S!;
       const cur = table.get(pk);
-      if (!evalCondition(i.ConditionExpression, cur)) throw new ConditionalCheckFailedException({ message: 'cond', $metadata: {} });
+      if (!evalCondition(i.ConditionExpression, cur, i.ExpressionAttributeValues)) throw new ConditionalCheckFailedException({ message: 'cond', $metadata: {} });
       const item: Item = structuredClone(cur ?? { pk: { S: pk } });
       for (const part of i.UpdateExpression.replace(/^SET\s+/, '').split(',')) {
         const [rawName, val] = part.split('=').map((s) => s.trim()) as [string, string];
@@ -197,7 +199,7 @@ export function setEnv(im: 'feishu' | 'lark' | 'dingtalk' | 'wecom', extra: Reco
     base.IM_APP_SECRET_ID = `${SLUG}/im-app`;
     base.IM_SCOPES = im === 'dingtalk' ? 'openid,corpid' : 'offline_access,im:message';
   }
-  for (const k of Object.keys(process.env)) if (k in base || k in extra || k === 'IM_APP_ID' || k === 'IM_APP_SECRET_ID' || k === 'IM_SCOPES') delete process.env[k];
+  for (const k of Object.keys(process.env)) if (k in base || k in extra || k === 'IM_APP_ID' || k === 'IM_APP_SECRET_ID' || k === 'IM_SCOPES' || k.startsWith('WECOM_')) delete process.env[k];
   Object.assign(process.env, base, extra);
 }
 

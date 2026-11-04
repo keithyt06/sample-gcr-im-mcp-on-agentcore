@@ -53,6 +53,8 @@ export class OauthFunction extends Construct {
     } else {
       environment[ENV.RUNTIME_ARN] = runtimeArn;
       environment[ENV.AGENTCORE_ENDPOINT] = d.agentcoreEndpoint;
+      environment[ENV.WECOM_MAX_PENDING_QR] = String(cfg.imConfig.wecom?.maxPendingQr ?? 20);
+      environment[ENV.WECOM_REQUIRE_APPROVAL] = String(cfg.imConfig.wecom?.requireApproval ?? false);
     }
 
     this.f = new ImFunction(this, 'Oauth', { name: 'oauth', names, environment });

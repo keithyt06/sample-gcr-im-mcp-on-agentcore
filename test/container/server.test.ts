@@ -73,6 +73,14 @@ describe('server (feishu)', () => {
     expect(read.annotations.readOnlyHint).toBe(true);
   });
 
+  it('tools/call and control RPCs without a User-Id header → JSON-RPC error (review L-10)', async () => {
+    const r = await fetch(`${h.srv.url}/mcp`, { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'feishu_calendar_agenda', arguments: {} } }) });
+    const body = JSON.parse((await r.text()).replace(/^event: message\ndata: /, ''));
+    expect(body).toMatchObject({ id: 7, error: { code: -32602 } });
+    const r2 = await fetch(`${h.srv.url}/mcp`, { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'tools/list' }) });
+    expect(await r2.text()).toContain('"tools"');
+  });
+
   it('ping and unknown methods', async () => {
     expect((await h.rpc('ping')).body.result).toEqual({});
     expect((await h.rpc('resources/list')).body.error.code).toBe(-32601);

@@ -14,6 +14,9 @@ import type { Image } from './image.js';
 /** The service principal is the same in both partitions (D2). */
 export const AGENTCORE_PRINCIPAL = 'bedrock-agentcore.amazonaws.com';
 
+/** Tag the wecom container puts on a user secret (read back by lambda/oauth/qr.ts). */
+export const WECOM_USER_TAG = 'WecomUserId';
+
 export interface RuntimeProps {
   cfg: Config;
   names: Names;
@@ -58,10 +61,26 @@ export class Runtime extends Construct {
       this.role.addToPolicy(new iam.PolicyStatement({ actions: ['secretsmanager:GetSecretValue'], resources: [imApp.secretArn] }));
     }
     if (adapter.runtimeWritesUserSecrets) {
+      // Known limitation (review M-8): one execution role serves every user's microVM and AgentCore passes no
+      // per-session tags, so access cannot be scoped to one user's secret. We narrow what we can:
+      // read/write only under <slug>/users/*, create only with this stack's CMK, tag only with WecomUserId,
+      // and no DescribeSecret (the container never calls it).
+      const users = userSecretsArn(stack, names);
+      this.role.addToPolicy(
+        new iam.PolicyStatement({ actions: ['secretsmanager:GetSecretValue', 'secretsmanager:PutSecretValue'], resources: [users] }),
+      );
       this.role.addToPolicy(
         new iam.PolicyStatement({
-          actions: ['secretsmanager:GetSecretValue', 'secretsmanager:PutSecretValue', 'secretsmanager:CreateSecret', 'secretsmanager:DescribeSecret', 'secretsmanager:TagResource'],
-          resources: [userSecretsArn(stack, names)],
+          actions: ['secretsmanager:CreateSecret'],
+          resources: [users],
+          conditions: { StringEquals: { 'secretsmanager:KmsKeyArn': cmk.keyArn } },
+        }),
+      );
+      this.role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['secretsmanager:TagResource'],
+          resources: [users],
+          conditions: { 'ForAllValues:StringEquals': { 'aws:TagKeys': [WECOM_USER_TAG] }, Null: { 'aws:TagKeys': 'false' } },
         }),
       );
       this.role.addToPolicy(

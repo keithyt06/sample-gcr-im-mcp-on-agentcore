@@ -1,7 +1,7 @@
 {
  "family": "lark",
  "cliVersion": "1.0.99",
- "generatedAt": "2026-11-04T18:19:10.161Z",
+ "generatedAt": "2026-11-04T19:32:20.788Z",
  "tools": [
   {
    "name": "application_slash_command_create",
@@ -1263,7 +1263,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "apps",
@@ -2000,7 +2000,8 @@
    "scopes": [
     "spark:app:read"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_db_data_import",
@@ -2015,10 +2016,6 @@
      "environment": {
       "type": "string",
       "description": "target db environment; leave unset to auto-select (multi-env app uses dev, single-env uses online), or pass dev/online (dev|online)"
-     },
-     "file": {
-      "type": "string",
-      "description": "local data file (.csv/.json), relative to cwd"
      },
      "format": {
       "type": "string",
@@ -2047,12 +2044,6 @@
      {
       "name": "environment",
       "key": "environment",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -2241,10 +2232,6 @@
       "type": "string",
       "description": "target db environment; leave unset to auto-select (multi-env app uses dev, single-env uses online), or pass dev/online (dev|online)"
      },
-     "file": {
-      "type": "string",
-      "description": "path to a .sql file (relative to cwd). Mutually exclusive with sql"
-     },
      "format": {
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
@@ -2272,12 +2259,6 @@
      {
       "name": "environment",
       "key": "environment",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -2563,7 +2544,8 @@
    "scopes": [
     "spark:app:write"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_db_sync_delete",
@@ -3323,7 +3305,8 @@
    "scopes": [
     "spark:app:read"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_env_set",
@@ -3460,7 +3443,8 @@
    "scopes": [
     "spark:app:read"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_feature_enable",
@@ -3690,7 +3674,8 @@
    "scopes": [
     "spark:app:read"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_file_get",
@@ -4035,7 +4020,8 @@
    "scopes": [
     "spark:app:write"
    ],
-   "category": "apps"
+   "category": "apps",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "apps_get",
@@ -4169,7 +4155,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "apps",
@@ -4267,17 +4253,9 @@
       "type": "string",
       "description": "app ID"
      },
-     "dir": {
-      "type": "string",
-      "description": "clone target directory; absolute or relative path (default ./<app-id>)"
-     },
      "format": {
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
-     },
-     "source_path": {
-      "type": "string",
-      "description": "path to existing source files (e.g. HTML output from an agent) to incorporate into the initialized project"
      }
     }
    },
@@ -4296,20 +4274,8 @@
       "required": false
      },
      {
-      "name": "dir",
-      "key": "dir",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "source-path",
-      "key": "source_path",
       "type": "string",
       "required": false
      }
@@ -7174,10 +7140,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "icon_file": {
-      "type": "string",
-      "description": "new app icon from a local png/jpeg file (≤2 MB); uploaded first, then written; mutually exclusive with icon_url"
-     },
      "icon_url": {
       "type": "string",
       "description": "new app icon as an http(s) image URL; mutually exclusive with icon_file"
@@ -7211,12 +7173,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "icon-file",
-      "key": "icon_file",
       "type": "string",
       "required": false
      },
@@ -11829,7 +11785,8 @@
     "base:record:read",
     "docs:document.media:download"
    ],
-   "category": "base"
+   "category": "base",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "base_record_get",
@@ -11866,10 +11823,6 @@
      "format": {
       "type": "string",
       "description": "output format: ndjson (default; records file plus manifest summary and column schema/stats) | json (inline raw matrix) (ndjson|json) (default \"ndjson\")"
-     },
-     "output": {
-      "type": "string",
-      "description": "preferred analysis output: relative .ndjson output path; omit to generate a filename automatically (requires ndjson)"
      },
      "overwrite": {
       "type": "boolean",
@@ -11918,12 +11871,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -12068,10 +12015,6 @@
       "type": "string",
       "description": "output format: ndjson (default; records file plus manifest summary and column schema/stats) | json (inline raw matrix) (ndjson|json) (default \"ndjson\")"
      },
-     "output": {
-      "type": "string",
-      "description": "preferred analysis output: relative .ndjson output path; omit to generate a filename automatically (requires ndjson)"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "replace an existing ndjson artifact and its manifest"
@@ -12137,12 +12080,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -12307,10 +12244,6 @@
       "type": "string",
       "description": "output format: ndjson (default; records file plus manifest summary and column schema/stats) | json (inline raw matrix) (ndjson|json) (default \"ndjson\")"
      },
-     "output": {
-      "type": "string",
-      "description": "preferred analysis output: relative .ndjson output path; omit to generate a filename automatically (requires ndjson)"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "replace an existing ndjson artifact and its manifest"
@@ -12394,12 +12327,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -12568,7 +12495,8 @@
     "base:record:update",
     "docs:document.media:upload"
    ],
-   "category": "base"
+   "category": "base",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "base_record_upsert",
@@ -17212,7 +17140,8 @@
     "docs:document.media:download",
     "docs:permission.member:auth"
    ],
-   "category": "docs"
+   "category": "docs",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "docs_media_insert",
@@ -17231,10 +17160,6 @@
      "doc": {
       "type": "string",
       "description": "document URL or document_id"
-     },
-     "file": {
-      "type": "string",
-      "description": "local file path (files > 20MB use multipart upload automatically)"
      },
      "file_view": {
       "type": "string",
@@ -17285,12 +17210,6 @@
      {
       "name": "doc",
       "key": "doc",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -17349,10 +17268,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "output": {
-      "type": "string",
-      "description": "local save path"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "overwrite existing output file"
@@ -17374,12 +17289,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -17473,7 +17382,8 @@
    "scopes": [
     "docs:document.media:upload"
    ],
-   "category": "docs"
+   "category": "docs",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "docs_resource_delete",
@@ -17495,7 +17405,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "docs",
@@ -17601,7 +17511,8 @@
     "docs:document.media:download",
     "docx:document:readonly"
    ],
-   "category": "docs"
+   "category": "docs",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "docs_resource_update",
@@ -17612,10 +17523,6 @@
      "doc": {
       "type": "string",
       "description": "document URL or document_id"
-     },
-     "file": {
-      "type": "string",
-      "description": "local image file path (files > 20MB use multipart upload automatically)"
      },
      "format": {
       "type": "string",
@@ -17654,12 +17561,6 @@
      {
       "name": "doc",
       "key": "doc",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -18533,10 +18434,6 @@
       "type": "boolean",
       "description": "list built-in cover specs without downloading"
      },
-     "output": {
-      "type": "string",
-      "description": "local output path for downloaded cover"
-     },
      "spec": {
       "type": "string",
       "description": "cover preset: default | icon | grid | small | middle | big | square"
@@ -18577,12 +18474,6 @@
       "name": "list-only",
       "key": "list_only",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
       "required": false
      },
      {
@@ -18944,7 +18835,8 @@
     "drive:file:download",
     "wiki:node:retrieve"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_export",
@@ -19071,7 +18963,8 @@
     "drive:drive.metadata:readonly",
     "wiki:node:retrieve"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_export_download",
@@ -19144,7 +19037,8 @@
    "scopes": [
     "docs:document:export"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_import",
@@ -19152,10 +19046,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "local file path (e.g. .docx, .xlsx, .md, .base, .pptx; large files auto use multipart upload; .base is capped at 20MB, .pptx at 500MB)"
-     },
      "folder_token": {
       "type": "string",
       "description": "target folder token (omit for root folder; API accepts empty mount_key as root)"
@@ -19186,12 +19076,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "folder-token",
       "key": "folder_token",
@@ -19932,10 +19816,6 @@
       "type": "boolean",
       "description": "list preview candidates without downloading"
      },
-     "output": {
-      "type": "string",
-      "description": "local output path for downloaded preview"
-     },
      "type": {
       "type": "string",
       "description": "preview type to download: pdf | html | text | image | source_file"
@@ -19984,12 +19864,6 @@
       "name": "list-only",
       "key": "list_only",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
       "required": false
      },
      {
@@ -20108,7 +19982,8 @@
     "drive:drive.metadata:readonly",
     "drive:file:download"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_push",
@@ -20194,7 +20069,8 @@
     "drive:file:upload",
     "space:folder:create"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_react_reply",
@@ -20841,10 +20717,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "local_dir": {
-      "type": "string",
-      "description": "local root directory (relative to cwd)"
-     },
      "quick": {
       "type": "boolean",
       "description": "compare modified_time only and skip remote downloads for files present on both sides"
@@ -20868,12 +20740,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "local-dir",
-      "key": "local_dir",
       "type": "string",
       "required": false
      },
@@ -20975,7 +20841,8 @@
     "drive:file:upload",
     "space:folder:create"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_task_result",
@@ -21306,7 +21173,8 @@
     "drive:drive.metadata:readonly",
     "drive:file:upload"
    ],
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_version_delete",
@@ -21376,10 +21244,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "output": {
-      "type": "string",
-      "description": "local save path or directory; omit to save into the current directory using the server filename"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "overwrite existing output file"
@@ -21407,12 +21271,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -22694,7 +22552,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "im",
@@ -22745,7 +22603,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "im",
@@ -23168,10 +23026,6 @@
       "type": "string",
       "description": "(one of content/--text/--markdown/--image/--file/--video/--audio required) message content JSON"
      },
-     "file": {
-      "type": "string",
-      "description": "file key (file_xxx), URL, or cwd-relative local path (absolute paths and .. are rejected)"
-     },
      "format": {
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
@@ -23237,12 +23091,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -23385,7 +23233,8 @@
    "scopes": [
     "im:message:readonly"
    ],
-   "category": "im"
+   "category": "im",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "im_messages_search",
@@ -23606,10 +23455,6 @@
       "type": "string",
       "description": "(one of content/--text/--markdown/--image/--file/--video/--audio required) message content JSON"
      },
-     "file": {
-      "type": "string",
-      "description": "file key (file_xxx), URL, or cwd-relative local path (absolute paths and .. are rejected)"
-     },
      "format": {
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
@@ -23677,12 +23522,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -23963,10 +23802,6 @@
       "type": "string",
       "description": "Full email body. Prefer HTML for rich formatting (bold, lists, links); plain text is also supported. Body type is auto-detected. Use plain_text to force plain-text mode. Mutually exclusive with body_file. Required unless template_id supplies a non-empty body."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "cc": {
       "type": "array",
       "items": {
@@ -24073,12 +23908,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -24208,10 +24037,6 @@
       "type": "string",
       "description": "Full email body for a complete replacement (set_body). Prefer HTML for rich formatting (bold, lists, links); plain text is also supported. Body type is auto-detected. Use patch_file with set_reply_body when you need to preserve an existing reply/forward quote block; use body when you want a full body replacement. Mutually exclusive with body_file. Cannot be combined with patch_file body ops."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "draft_id": {
       "type": "string",
       "description": "Target draft ID. Required for real edits. It can be omitted only when using the print_patch_template flag by itself."
@@ -24231,10 +24056,6 @@
      "mailbox": {
       "type": "string",
       "description": "Mailbox email address that owns the draft (default: falls back to from, then me). Takes priority over from when both are set."
-     },
-     "patch_file": {
-      "type": "string",
-      "description": "Advanced edit entry point for body edits, incremental recipient changes, header edits, attachment changes, or inline-image changes. Use body/--body-file for quick full-body replacement; use patch_file with set_body/set_reply_body when you need typed body ops, especially set_reply_body to preserve an existing reply/forward quote block. Run inspect first to check has_quoted_content, then print_patch_template for the JSON structure. Relative path only."
      },
      "print_patch_template": {
       "type": "boolean",
@@ -24305,12 +24126,6 @@
       "required": false
      },
      {
-      "name": "body-file",
-      "key": "body_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "draft-id",
       "key": "draft_id",
       "type": "string",
@@ -24337,12 +24152,6 @@
      {
       "name": "mailbox",
       "key": "mailbox",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "patch-file",
-      "key": "patch_file",
       "type": "string",
       "required": false
      },
@@ -24524,10 +24333,6 @@
       "type": "string",
       "description": "Body prepended before the forwarded message. Prefer HTML for rich formatting; plain text is also supported. Body type is auto-detected from the forward body and the original message. Use plain_text to force plain-text mode. Mutually exclusive with body_file."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "cc": {
       "type": "array",
       "items": {
@@ -24646,12 +24451,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -24803,10 +24602,6 @@
       "type": "string",
       "description": "HTML body to lint. Mutually exclusive with body_file; exactly one is required."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing HTML to lint. Mutually exclusive with body; exactly one is required."
-     },
      "format": {
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
@@ -24828,12 +24623,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -25179,10 +24968,6 @@
       "type": "string",
       "description": "Reply body. Prefer HTML for rich formatting; plain text is also supported. Body type is auto-detected from the reply body and the original message. Use plain_text to force plain-text mode. Mutually exclusive with body_file. Required unless template_id supplies a non-empty body."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "cc": {
       "type": "array",
       "items": {
@@ -25301,12 +25086,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -25472,10 +25251,6 @@
       "type": "string",
       "description": "Reply body. Prefer HTML for rich formatting; plain text is also supported. Body type is auto-detected from the reply body and the original message. Use plain_text to force plain-text mode. Mutually exclusive with body_file. Required unless template_id supplies a non-empty body."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "cc": {
       "type": "array",
       "items": {
@@ -25601,12 +25376,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -26460,10 +26229,6 @@
       "type": "string",
       "description": "Email body. Prefer HTML for rich formatting (bold, lists, links); plain text is also supported. Body type is auto-detected. Use plain_text to force plain-text mode. Mutually exclusive with body_file. Required unless template_id supplies a non-empty body."
      },
-     "body_file": {
-      "type": "string",
-      "description": "Path (relative, within cwd subtree) to a file containing the email body HTML. Mutually exclusive with body. Size capped at 32 MB."
-     },
      "cc": {
       "type": "array",
       "items": {
@@ -26578,12 +26343,6 @@
      {
       "name": "body",
       "key": "body",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "body-file",
-      "key": "body_file",
       "type": "string",
       "required": false
      },
@@ -26982,10 +26741,6 @@
       "type": "string",
       "description": "Template body content. Prefer HTML. Referenced local images (<img src=\"./file.png\">) are auto-uploaded to Drive and rewritten to cid: refs."
      },
-     "template_content_file": {
-      "type": "string",
-      "description": "Optional. Path to a file whose contents become template_content. Relative path only. Mutually exclusive with template_content."
-     },
      "to": {
       "type": "array",
       "items": {
@@ -27064,12 +26819,6 @@
       "required": false
      },
      {
-      "name": "template-content-file",
-      "key": "template_content_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "to",
       "key": "to",
       "type": "stringArray",
@@ -27115,10 +26864,6 @@
       "type": "string",
       "description": "Mailbox email address that owns the template (default: me)."
      },
-     "patch_file": {
-      "type": "string",
-      "description": "Path to a JSON patch file (relative path only). Shape is the same as print_patch_template output."
-     },
      "print_patch_template": {
       "type": "boolean",
       "description": "Print a JSON template describing the supported patch_file structure. No network call is made."
@@ -27146,10 +26891,6 @@
      "set_template_content": {
       "type": "string",
       "description": "Replace the template body content. Prefer HTML for rich formatting."
-     },
-     "set_template_content_file": {
-      "type": "string",
-      "description": "Replace template body content with the contents of a file (relative path only). Mutually exclusive with set_template_content."
      },
      "set_to": {
       "type": "string",
@@ -27200,12 +26941,6 @@
       "required": false
      },
      {
-      "name": "patch-file",
-      "key": "patch_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "print-patch-template",
       "key": "print_patch_template",
       "type": "bool",
@@ -27244,12 +26979,6 @@
      {
       "name": "set-template-content",
       "key": "set_template_content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "set-template-content-file",
-      "key": "set_template_content_file",
       "type": "string",
       "required": false
      },
@@ -27761,7 +27490,8 @@
     "mail:user_mailbox.message:readonly",
     "mail:user_mailbox:readonly"
    ],
-   "category": "mail"
+   "category": "mail",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "markdown_create",
@@ -27772,10 +27502,6 @@
      "content": {
       "type": "string",
       "description": "Markdown content"
-     },
-     "file": {
-      "type": "string",
-      "description": "local .md file path"
      },
      "folder_token": {
       "type": "string",
@@ -27806,12 +27532,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -27857,10 +27577,6 @@
       "type": "number",
       "description": "number of unchanged context lines to include around each diff hunk (default 3)"
      },
-     "file": {
-      "type": "string",
-      "description": "local .md file path to compare against the remote content"
-     },
      "file_token": {
       "type": "string",
       "description": "target Markdown file token"
@@ -27891,12 +27607,6 @@
       "name": "context-lines",
       "key": "context_lines",
       "type": "int",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
       "required": false
      },
      {
@@ -27944,10 +27654,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "output": {
-      "type": "string",
-      "description": "local save path or directory; omit to return content directly"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "overwrite existing local output file"
@@ -27975,12 +27681,6 @@
       "required": false
      },
      {
-      "name": "output",
-      "key": "output",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "overwrite",
       "key": "overwrite",
       "type": "bool",
@@ -28002,10 +27702,6 @@
      "content": {
       "type": "string",
       "description": "new Markdown content"
-     },
-     "file": {
-      "type": "string",
-      "description": "local .md file path"
      },
      "file_token": {
       "type": "string",
@@ -28032,12 +27728,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -28217,10 +27907,6 @@
       "type": "string",
       "description": "minute tokens, comma-separated for batch"
      },
-     "output_dir": {
-      "type": "string",
-      "description": "output directory for transcript files (default: ./minutes/{minute_token}/)"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "overwrite existing transcript files"
@@ -28268,12 +27954,6 @@
      {
       "name": "minute-tokens",
       "key": "minute_tokens",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
       "type": "string",
       "required": false
      },
@@ -28390,7 +28070,8 @@
    "scopes": [
     "minutes:minutes.media:export"
    ],
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_search",
@@ -28918,10 +28599,6 @@
       "type": "string",
       "description": "note ID"
      },
-     "output": {
-      "type": "string",
-      "description": "output file path (default: ./notes/{note_id}/unified_transcript.{md,txt})"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "overwrite an existing output file"
@@ -28955,12 +28632,6 @@
      {
       "name": "note-id",
       "key": "note_id",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -30598,7 +30269,8 @@
    "scopes": [
     "okr:okr.progress.file:upload"
    ],
-   "category": "okr"
+   "category": "okr",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "okr_weight",
@@ -31282,10 +30954,6 @@
       "type": "number",
       "description": "Max output chars per call; default 500000 (safety cap). For a full untruncated read, use output_path to dump to a file (the cap auto-raises to a bounded 20M chars — the read path is not streaming, this cap is the memory guard; pass an explicit max_chars for more); only lower it (e.g. 25000) when you want results inline without a file, paging via has_more. Passing 0 means \"no cap of my own\" and resolves to the same ceiling as leaving the flag alone (500000, or the offload limit with output_path) — never down to the tool's smaller omitted-value fallback. (default 500000)"
      },
-     "output_path": {
-      "type": "string",
-      "description": "Write the full read result to a local path (e.g. ./out.json); the file holds the data payload as JSON while stdout returns only a small confirmation (output_path, byte count). **When set, the char cap auto-raises to a bounded offload default (20M chars)** rather than unlimited — the read path is not streaming, so this cap is the memory guard; an explicit max_chars overrides it. The stdout receipt reports `complete` (and `truncated` plus a warning when the cap was hit), so check it instead of assuming the file holds the whole sheet. Omit it to print to stdout as usual."
-     },
      "range": {
       "type": "string",
       "description": "A1 range, e.g. A1:F10 (no sheet prefix — use `sheet_id` / `sheet_name` to select the sheet)"
@@ -31339,12 +31007,6 @@
       "name": "max-chars",
       "key": "max_chars",
       "type": "int",
-      "required": false
-     },
-     {
-      "name": "output-path",
-      "key": "output_path",
-      "type": "string",
       "required": false
      },
      {
@@ -34273,10 +33935,6 @@
       "type": "number",
       "description": "Max output chars per call; default 500000 (safety cap). For a full untruncated read, use output_path to dump to a file (the cap auto-raises to a bounded 20M chars — the read path is not streaming, this cap is the memory guard; pass an explicit max_chars for more); only lower it (e.g. 25000) when you want results inline without a file, paging via has_more. Passing 0 means \"no cap of my own\" and resolves to the same ceiling as leaving the flag alone (500000, or the offload limit with output_path) — never down to the tool's smaller omitted-value fallback. (default 500000)"
      },
-     "output_path": {
-      "type": "string",
-      "description": "Write the full read result to a local path (e.g. ./out.json); the file holds the data payload as JSON while stdout returns only a small confirmation (output_path, byte count). **When set, the char cap auto-raises to a bounded offload default (20M chars)** rather than unlimited — the read path is not streaming, so this cap is the memory guard; an explicit max_chars overrides it. The stdout receipt reports `complete` (and `truncated` plus a warning when the cap was hit), so check it instead of assuming the file holds the whole sheet. Note the file is the data payload as JSON — on +csv-get too, where the CSV text sits in a field inside it — not a ready-to-use .csv; redirect stdout instead if you want a bare CSV file. Omit it to print to stdout as usual."
-     },
      "range": {
       "type": "string",
       "description": "A1 range, e.g. A1:F30 (no sheet prefix — use `sheet_id` / `sheet_name` to select the sheet). Optional: when omitted the whole sheet is read (clipped to the actual grid bounds; actual_range in the response names what was read); pair with max_chars / output_path on large sheets"
@@ -34327,12 +33985,6 @@
       "name": "max-chars",
       "key": "max_chars",
       "type": "int",
-      "required": false
-     },
-     {
-      "name": "output-path",
-      "key": "output_path",
-      "type": "string",
       "required": false
      },
      {
@@ -39611,10 +39263,6 @@
       "type": "boolean",
       "description": "Treat the first row as data instead of a header (columns get positional names col1, col2, ...)"
      },
-     "output_path": {
-      "type": "string",
-      "description": "Write the full read result to a local path (e.g. ./out.json); the file holds the data payload as JSON while stdout returns only a small confirmation (output_path, byte count). **When set, the char cap auto-raises to a bounded offload default (20M chars)** rather than unlimited — the read path is not streaming, so this cap is the memory guard; an explicit max_chars overrides it. The stdout receipt reports `complete` (and `truncated` plus a warning when the cap was hit), so check it instead of assuming the file holds the whole sheet. Omit it to print to stdout as usual."
-     },
      "range": {
       "type": "string",
       "description": "A1 range to read; omit to read each sheet's full used range (spans internal blank rows/columns, not just the A1 current region)"
@@ -39661,12 +39309,6 @@
       "name": "no-header",
       "key": "no_header",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "output-path",
-      "key": "output_path",
-      "type": "string",
       "required": false
      },
      {
@@ -39953,7 +39595,8 @@
     "drive:drive.metadata:readonly",
     "sheets:spreadsheet:read"
    ],
-   "category": "sheets"
+   "category": "sheets",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheets_workbook_import",
@@ -40020,7 +39663,8 @@
     "docs:document.media:upload",
     "docs:document:import"
    ],
-   "category": "sheets"
+   "category": "sheets",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheets_workbook_info",
@@ -40263,7 +39907,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "slides",
@@ -40539,7 +40183,8 @@
     "docs:document.media:download",
     "drive:file:download"
    ],
-   "category": "slides"
+   "category": "slides",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "slides_media_upload",
@@ -40593,7 +40238,8 @@
     "docs:document.media:upload",
     "wiki:node:read"
    ],
-   "category": "slides"
+   "category": "slides",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "slides_replace_pages",
@@ -40789,14 +40435,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "output": {
-      "type": "string",
-      "description": "preferred relative output path for a single screenshot (extension optional; .png, .jpg, or .jpeg)"
-     },
-     "output_dir": {
-      "type": "string",
-      "description": "relative directory for saved screenshots (default \".lark-slides/screenshots\")"
-     },
      "output_name": {
       "type": "string",
       "description": "file name stem for content render output"
@@ -40835,18 +40473,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
       "type": "string",
       "required": false
      },
@@ -40988,10 +40614,6 @@
       "type": "string",
       "description": "output format: json (default) | pretty | table | ndjson | csv (default \"json\")"
      },
-     "output": {
-      "type": "string",
-      "description": "local XML output path; must be a relative path within the current directory; existing file is overwritten; omit to return XML in the JSON envelope"
-     },
      "presentation": {
       "type": "string",
       "description": "xml_presentation_id, slides URL, or wiki URL that resolves to slides"
@@ -41029,12 +40651,6 @@
      {
       "name": "format",
       "key": "format",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
       "type": "string",
       "required": false
      },
@@ -42372,7 +41988,8 @@
    "scopes": [
     "task:attachment:write"
    ],
-   "category": "task"
+   "category": "task",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "vc_detail",
@@ -42957,7 +42574,8 @@
    "scopes": [
     "board:whiteboard:node:read"
    ],
-   "category": "whiteboard"
+   "category": "whiteboard",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "whiteboard_update",
@@ -43281,7 +42899,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "wiki",

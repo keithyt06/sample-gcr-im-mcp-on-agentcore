@@ -7,6 +7,22 @@ const AUTHORIZE_URL = 'https://login.dingtalk.com/oauth2/auth';
 const TOKEN_URL = 'https://api.dingtalk.com/v1.0/oauth2/userAccessToken';
 const USER_ME_URL = 'https://api.dingtalk.com/v1.0/contact/users/me';
 
+/** Error codes that mean the app (clientId/clientSecret) was rejected, not the user grant. */
+const APP_REJECTED_RE = /appkey|appsecret|clientid|clientsecret|invalid_?client|invalidauthentication|app\.?not|forbidden\.accessdenied/i;
+/** Error codes that explicitly mean the refresh token / grant is invalid, expired, or revoked. */
+const GRANT_REVOKED_RE = /refresh_?token|invalid_?grant|authcode|token\.?(expired|invalid|revoked|notfound)|revoked/i;
+
+/**
+ * Classifies a non-2xx refresh response (review M-4). Only explicit grant errors on 400/401
+ * are terminal; app-credential errors, 429, 5xx, and unknown codes are transient.
+ */
+export function classifyDingtalkRefreshError(status: number, body: Record<string, unknown> | null): { revoked: boolean; appRejected: boolean } {
+  const code = `${str(body?.code) ?? ''} ${str(body?.errorCode) ?? ''} ${str(body?.error) ?? ''}`;
+  if (APP_REJECTED_RE.test(code)) return { revoked: false, appRejected: true };
+  if ((status === 400 || status === 401) && GRANT_REVOKED_RE.test(code)) return { revoked: true, appRejected: false };
+  return { revoked: false, appRejected: false };
+}
+
 export function createDingtalkAdapter(d?: AdapterDeps): RedirectAdapter {
   const deps: ResolvedDeps = resolveDeps(d);
 
@@ -65,8 +81,11 @@ export function createDingtalkAdapter(d?: AdapterDeps): RedirectAdapter {
       } catch (e) {
         return { ok: false, revoked: false, reason: e instanceof Error ? e.message : 'network_error' };
       }
-      if (r.status >= 400 && r.status < 500) return { ok: false, revoked: true, reason: `http_${r.status}` };
-      if (r.status >= 500) return { ok: false, revoked: false, reason: `http_${r.status}` };
+      if (r.status >= 400) {
+        const c = classifyDingtalkRefreshError(r.status, r.body);
+        const reason = `http_${r.status}${str(r.body?.code) ? `:${str(r.body?.code)}` : ''}`;
+        return { ok: false, revoked: c.revoked, reason, ...(c.appRejected ? { appRejected: true } : {}) };
+      }
       try {
         return { ok: true, tokens: toTokens(r.body, 'refresh_token') };
       } catch (e) {

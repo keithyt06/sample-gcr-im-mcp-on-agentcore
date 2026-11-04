@@ -74,7 +74,8 @@ async function refreshOne(name: string, adapter: RedirectAdapter, app: () => Pro
       }
       return 'revoked';
     }
-    log('WARN', 'refresh_failed', { userIdHash, reason: r.reason });
+    if (r.appRejected) log('ERROR', 'im_app_credential_rejected', { userIdHash, reason: r.reason, note: 'check npm run secret:set-im-app; user credentials kept' });
+    else log('WARN', 'refresh_failed', { userIdHash, reason: r.reason });
     metric('RefreshFailed');
     return 'failed';
   }

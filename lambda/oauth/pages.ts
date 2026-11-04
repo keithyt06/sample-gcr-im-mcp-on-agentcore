@@ -59,13 +59,14 @@ function page(lang: Lang, title: string, bodyHtml: string, statusCode: number, o
   return html(statusCode, body, { 'Content-Security-Policy': csp });
 }
 
-export function errorPage(lang: Lang, key: ErrorKey, statusCode = 400): HttpResult {
-  return page(
+export function errorPage(lang: Lang, key: ErrorKey, statusCode = 400, headers: Record<string, string> = {}): HttpResult {
+  const r = page(
     lang,
     t(lang, 'title_error'),
     `<h2 class="err">${escapeHtml(t(lang, 'title_error'))}</h2><p>${escapeHtml(t(lang, key))}</p><p class="hint">${escapeHtml(t(lang, 'error_hint'))}</p>`,
     statusCode,
   );
+  return { ...r, headers: { ...r.headers, ...headers } };
 }
 
 export function successPage(lang: Lang, displayName: string): HttpResult {
@@ -95,14 +96,15 @@ export function qrPage(lang: Lang, p: QrPageInput): HttpResult {
     `<h2>${escapeHtml(t(lang, 'qr_heading'))}</h2><p class="hint">${escapeHtml(t(lang, 'qr_intro'))}</p>` +
     `<div class="warn">${escapeHtml(t(lang, 'qr_warning'))}</div>${qrBlock}` +
     `<p id="s">${escapeHtml(t(lang, 'qr_waiting'))}</p><p class="hint">${escapeHtml(t(lang, 'qr_bind_existing'))}</p>`;
-  const msgs = { done: t(lang, 'qr_done'), failed: t(lang, 'qr_failed'), timeout: t(lang, 'qr_timeout') };
+  const msgs = { done: t(lang, 'qr_done'), failed: t(lang, 'qr_failed'), timeout: t(lang, 'qr_timeout'), approval: t(lang, 'qr_pending_approval'), revoked: t(lang, 'err_access_revoked') };
   // JSON.stringify output is embedded in a script; escape '<' so no "</script>" can appear.
   const js = (v: unknown): string => JSON.stringify(v).replace(/</g, '\\u003c');
   const script = (): string =>
     `const f=${js(p.flow)},m=${js(msgs)},t0=Date.now(),s=document.getElementById('s');` +
     `async function tick(){try{const r=await fetch('/authorize/status?flow='+encodeURIComponent(f),{cache:'no-store'});` +
     `const d=await r.json();if(d.status==='authorized'&&d.redirect){s.textContent=m.done;location.replace(d.redirect);return}` +
-    `if(d.status==='expired'||d.status==='failed'){s.textContent=m.failed;return}}catch(e){}` +
+    `if(d.status==='pending_approval'){s.textContent=m.approval;return}` +
+    `if(d.status==='expired'||d.status==='failed'){s.textContent=d.reason==='access_revoked'?m.revoked:m.failed;return}}catch(e){}` +
     `if(Date.now()-t0>310000){s.textContent=m.timeout;return}setTimeout(tick,2000)}setTimeout(tick,2000);`;
   return page(lang, t(lang, 'title_qr'), body, 200, { script, images: true });
 }

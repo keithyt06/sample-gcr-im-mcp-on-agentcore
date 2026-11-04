@@ -21,7 +21,11 @@ export interface ImIdentity {
   displayName?: string;
 }
 
-export type RefreshResult = { ok: true; tokens: ImTokenSet } | { ok: false; revoked: boolean; reason: string };
+/**
+ * revoked: the user grant is definitively dead (delete the credential).
+ * appRejected: the IM rejected the app credential itself; never delete user credentials.
+ */
+export type RefreshResult = { ok: true; tokens: ImTokenSet } | { ok: false; revoked: boolean; reason: string; appRejected?: boolean };
 
 export interface RedirectAdapter {
   readonly mode: 'redirect';

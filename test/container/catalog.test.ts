@@ -27,6 +27,29 @@ describe.each(FAMILIES)('catalog %s', (fam) => {
     expect(new Set(tier1).size).toBe(tier1.length);
   });
 
+  it('no available tool can spawn local processes or daemons (review H-2)', () => {
+    const danger = new Set(['agent-cmd', 'agent-workdir', 'daemon', 'alwayson', 'yolo']);
+    for (const t of catalog.tools) {
+      if (t.unavailable) continue;
+      expect((t.cli.flags ?? []).filter((f) => danger.has(f.name)), t.name).toEqual([]);
+      expect(t.name, t.name).not.toMatch(/^dingtalk_tag_connect|^dingtalk_tag_manage_login$|^mail_watch$/);
+    }
+  });
+
+  it('no available tool takes a local file path (review M-6)', () => {
+    const fileFlags = new Set(['file', 'file-path', 'output', 'output-dir', 'output-path', 'local-dir', 'local-folder', 'body-file', 'content-file', 'records-file', 'media-files', 'dir']);
+    for (const t of catalog.tools) {
+      if (t.unavailable) continue;
+      expect((t.cli.flags ?? []).filter((f) => fileFlags.has(f.name)).map((f) => f.name), t.name).toEqual([]);
+    }
+  });
+
+  it('destructive names always require confirmation (review M-5)', () => {
+    for (const t of catalog.tools) {
+      if (/(^|_)(delete|remove|recall|transfer_owner|revoke|clear|disband|kick)(_|$)/.test(t.name)) expect(t.risk, t.name).toBe('high-risk-write');
+    }
+  });
+
   it('tool names are unique, unprefixed and fit MCP limits', () => {
     expect(byName.size).toBe(catalog.tools.length);
     for (const t of catalog.tools) {
@@ -84,5 +107,13 @@ describe('catalog loading', () => {
       expect(c.byName.get(n)?.unavailable, n).toBeTruthy();
       expect(c.tier1Names.has(n)).toBe(false);
     }
+  });
+});
+
+describe('CLI integrity pins (review M-7)', () => {
+  it('container/build/cli-integrity.json pins every package in shared/versions.ts', () => {
+    const pins = JSON.parse(readFileSync(join(ROOT, 'container/build/cli-integrity.json'), 'utf8')) as Record<string, string>;
+    const want = [`${CLI.lark.pkg}@${CLI.lark.version}`, `${CLI.dingtalk.pkg}@${CLI.dingtalk.version}`, `${CLI.wecom.pkg}@${CLI.wecom.version}`, `${CLI.wecom.platformPkg}@${CLI.wecom.version}`];
+    for (const k of want) expect(pins[k], k).toMatch(/^sha512-[A-Za-z0-9+/]{86}==$/);
   });
 });

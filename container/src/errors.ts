@@ -1,6 +1,7 @@
 // Tool-level error envelope (technical design §4.7).
 import type { ErrorCode } from '../../shared/contract';
 import type { ToolResult } from './adapters/types';
+import { redact } from './cli-runner';
 
 export interface ErrorExtra {
   user_action?: string;
@@ -45,7 +46,7 @@ export const USER_ACTIONS: Partial<Record<ErrorCode, string>> = {
 };
 
 export function envelope(code: ErrorCode, message: string, extra: ErrorExtra = {}): ToolResult {
-  const error: Record<string, unknown> = { code, message };
+  const error: Record<string, unknown> = { code, message: redact(message) };
   const userAction = extra.user_action ?? USER_ACTIONS[code];
   if (userAction) error.user_action = userAction;
   for (const k of ['authorize_url', 'required_scopes', 'im_code', 'retry_after_sec'] as const) {

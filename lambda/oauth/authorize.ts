@@ -9,13 +9,22 @@ import { loadKeys } from '../shared/keys';
 import { hashUserId, log } from '../shared/log';
 import { isAllowedRedirect, redirectMatches, withParams } from '../shared/redirects';
 import { control } from '../shared/runtime-client';
-import { putFlow } from '../shared/store';
+import { acquireQrSlot, putFlow, releaseQrSlot } from '../shared/store';
 import { newState, newUserId, verifyClientId, verifyIncrToken } from '../shared/tokens';
 import { getAdapter, imScopes, langOf } from './context';
 import { errorPage, qrPage } from './pages';
 
 const SCOPE_RE = /^[a-z][a-z0-9_:.-]{1,100}$/;
 const CHALLENGE_RE = /^[A-Za-z0-9_-]{43,128}$/;
+/** QR poll timeout in the CLI is 300 s; the slot outlives it slightly. */
+const QR_SLOT_TTL_SEC = 310;
+const QR_MAX_PER_SOURCE = 3;
+const DEFAULT_MAX_PENDING_QR = 20;
+
+export function maxPendingQr(): number {
+  const n = Number(envOpt(ENV.WECOM_MAX_PENDING_QR));
+  return Number.isInteger(n) && n > 0 ? n : DEFAULT_MAX_PENDING_QR;
+}
 
 export interface AuthStartResult {
   status: 'pending' | 'already_authorized' | string;
@@ -79,16 +88,26 @@ export async function authorize(event: HttpEvent): Promise<HttpResult> {
   }
 
   // ---- wecom: start a QR session in the user's microVM ----
+  // Each start holds a microVM for up to 300 s, so pending sessions are capped globally
+  // and per source IP before any session is created (review H-1).
+  const sourceHash = hashUserId(`ip:${event.requestContext.http.sourceIp ?? 'unknown'}`);
+  const slot = await acquireQrSlot(state, sourceHash, Math.floor(Date.now() / 1000) + QR_SLOT_TTL_SEC, maxPendingQr(), QR_MAX_PER_SOURCE);
+  if (!slot.ok) {
+    log('WARN', 'qr_start_throttled', { reason: slot.reason });
+    return errorPage(lang, 'err_too_many_pending', 429, { 'Retry-After': '60' });
+  }
   const userId = newUserId();
   let start: AuthStartResult;
   try {
     start = await control<AuthStartResult>('im/auth.start', {}, userId);
   } catch (e) {
     log('ERROR', 'qr_start_failed', { userIdHash: hashUserId(userId), error: e instanceof Error ? e.message : 'unknown' });
+    await releaseQrSlot(state).catch(() => undefined);
     return errorPage(lang, 'err_upstream', 502);
   }
   if (start.status !== 'pending' || !start.authorizeUrl) {
     log('ERROR', 'qr_start_unexpected', { status: start.status });
+    await releaseQrSlot(state).catch(() => undefined);
     return errorPage(lang, 'err_upstream', 502);
   }
   await putFlow(state, { kind: 'qr', ...common, userId, scopes: [], containerSessionId: start.sessionId });

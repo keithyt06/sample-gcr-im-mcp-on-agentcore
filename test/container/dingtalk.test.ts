@@ -70,6 +70,24 @@ describe('dingtalk adapter via server', () => {
     expect((await h.call('dingtalk_contact_user_get_self', {}, tokenHeaders('user-a', 'tok-a'))).envelope.error.code).toBe('im_reauth_required');
   });
 
+  it('CLI killed by SIGKILL: no argv / token in the result (review M-1)', async () => {
+    h.control({ scenario: 'sigkill' });
+    const r = await h.call('dingtalk_contact_user_get_self', {}, tokenHeaders('user-a', 'tok-secret-123456'));
+    expect(r.envelope.error.code).toBe('cli_failed');
+    const text = JSON.stringify(r.result);
+    expect(text).not.toContain('tok-secret-123456');
+    expect(text).not.toContain('Command failed');
+    expect(text).toContain('SIGKILL');
+  });
+
+  it('a CLI echoing the token in its error output is redacted (review M-1)', async () => {
+    h.control({ scenario: 'echo_token' });
+    const r = await h.call('dingtalk_contact_user_get_self', {}, tokenHeaders('user-a', 'tok-secret-654321'));
+    const text = JSON.stringify(r.result);
+    expect(text).not.toContain('tok-secret-654321');
+    expect(text).toContain('[REDACTED]');
+  });
+
   it('cli_not_enabled → im_admin_action_required', async () => {
     h.control({ scenario: 'admin' });
     expect((await h.call('dingtalk_contact_user_get_self', {}, tokenHeaders('user-a', 'tok-a'))).envelope.error.code).toBe('im_admin_action_required');

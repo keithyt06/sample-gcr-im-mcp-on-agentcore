@@ -3,7 +3,7 @@ import { formOrJson, json, type HttpEvent, type HttpResult } from '../shared/htt
 import { loadKeys } from '../shared/keys';
 import { hashUserId, log } from '../shared/log';
 import { redirectMatches } from '../shared/redirects';
-import { consumeCode, consumeRefresh, getUser, putRefresh, touchUser } from '../shared/store';
+import { consumeCode, consumeRefresh, getUser, putRefresh, touchUser, userStatus } from '../shared/store';
 import { ACCESS_TTL_SEC, mintAccessToken, newRefreshToken, newState, pkceS256, safeEqual, verifyClientId, type Keys } from '../shared/tokens';
 
 type OAuthError = 'invalid_request' | 'invalid_client' | 'invalid_grant' | 'unsupported_grant_type';
@@ -13,7 +13,8 @@ const err = (error: OAuthError, description: string): HttpResult =>
 
 async function issue(keys: Keys, userId: string, clientId: string, family: string | undefined): Promise<HttpResult> {
   const refreshToken = newRefreshToken();
-  await putRefresh(refreshToken, { userId, clientId, family: family ?? newState() }, family === undefined);
+  const stored = await putRefresh(refreshToken, { userId, clientId, family: family ?? newState() }, family === undefined);
+  if (!stored) return err('invalid_grant', 'refresh_token family revoked');
   return json(
     200,
     { access_token: mintAccessToken(keys, userId), token_type: 'Bearer', expires_in: ACCESS_TTL_SEC, refresh_token: refreshToken, scope: 'mcp' },
@@ -34,8 +35,8 @@ export async function token(event: HttpEvent): Promise<HttpResult> {
     if (!safeEqual(rec.clientId, f.client_id)) return err('invalid_grant', 'code was issued to another client');
     if (!redirectMatches(f.redirect_uri, rec.redirectUri)) return err('invalid_grant', 'redirect_uri mismatch');
     if (!safeEqual(pkceS256(f.code_verifier), rec.codeChallenge)) return err('invalid_grant', 'code_verifier mismatch');
-    const user = await getUser(rec.userId);
-    if (user?.disabled) return err('invalid_grant', 'access revoked');
+    const status = userStatus(await getUser(rec.userId));
+    if (status !== 'active') return err('invalid_grant', status === 'pending_approval' ? 'pending operator approval' : 'access revoked');
     await touchUser(rec.userId);
     log('INFO', 'token_issued', { userIdHash: hashUserId(rec.userId), grant: 'authorization_code' });
     return issue(keys, rec.userId, f.client_id, undefined);
@@ -50,8 +51,8 @@ export async function token(event: HttpEvent): Promise<HttpResult> {
       return err('invalid_grant', r.reason === 'replay' ? 'refresh_token reuse detected' : 'invalid refresh_token');
     }
     if (!safeEqual(r.rec.clientId, f.client_id)) return err('invalid_grant', 'refresh_token was issued to another client');
-    const user = await getUser(r.rec.userId);
-    if (user?.disabled) return err('invalid_grant', 'access revoked');
+    const status = userStatus(await getUser(r.rec.userId));
+    if (status !== 'active') return err('invalid_grant', status === 'pending_approval' ? 'pending operator approval' : 'access revoked');
     log('INFO', 'token_issued', { userIdHash: hashUserId(r.rec.userId), grant: 'refresh_token' });
     return issue(keys, r.rec.userId, f.client_id, r.rec.family);
   }

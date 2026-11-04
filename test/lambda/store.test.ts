@@ -118,4 +118,55 @@ describe('store', () => {
       'unsupported attribute type',
     );
   });
+
+  it('L-1: rotation does not resurrect a family revoked concurrently', async () => {
+    await store.putRefresh('r1.a', { userId: USER_A, clientId: 'c', family: 'famx' }, true);
+    table.delete('rfam#famx');
+    expect(await store.putRefresh('r1.b', { userId: USER_A, clientId: 'c', family: 'famx' }, false)).toBe(false);
+    expect(table.has('rfam#famx')).toBe(false);
+    expect(table.has(`refresh#${sha256Hex('r1.b')}`)).toBe(false);
+  });
+
+  it('L-1: other UpdateItem errors propagate', async () => {
+    const { UpdateItemCommand } = await import('@aws-sdk/client-dynamodb');
+    ddbMock.on(UpdateItemCommand).rejects(new Error('ddb'));
+    await expect(store.putRefresh('r1.c', { userId: USER_A, clientId: 'c', family: 'f' }, false)).rejects.toThrow('ddb');
+  });
+
+  it('userStatus precedence', () => {
+    const u = { im: 'wecom' as const, createdAt: 1, lastLoginAt: 1 };
+    expect(store.userStatus(null)).toBe('active');
+    expect(store.userStatus(u)).toBe('active');
+    expect(store.userStatus({ ...u, approval: 'approved' })).toBe('active');
+    expect(store.userStatus({ ...u, approval: 'pending' })).toBe('pending_approval');
+    expect(store.userStatus({ ...u, approval: 'pending', replacedBy: 'x', disabled: true })).toBe('replaced');
+    expect(store.userStatus({ ...u, approval: 'pending', disabled: true })).toBe('revoked');
+  });
+
+  it('QR slots: global cap, per-source cap, expiry, release', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    expect(await store.acquireQrSlot('s1', 'ipA', now + 300, 3, 2)).toEqual({ ok: true });
+    expect(await store.acquireQrSlot('s2', 'ipA', now + 300, 3, 2)).toEqual({ ok: true });
+    expect(await store.acquireQrSlot('s3', 'ipA', now + 300, 3, 2)).toEqual({ ok: false, reason: 'source' });
+    expect(await store.acquireQrSlot('s3', 'ipB', now + 300, 3, 2)).toEqual({ ok: true });
+    expect(await store.acquireQrSlot('s4', 'ipC', now + 300, 3, 2)).toEqual({ ok: false, reason: 'global' });
+    await store.releaseQrSlot('s1');
+    expect(await store.acquireQrSlot('s4', 'ipC', now + 300, 3, 2)).toEqual({ ok: true });
+    // expired entries are pruned
+    expect(await store.acquireQrSlot('s5', 'ipD', now - 1, 10, 10)).toEqual({ ok: true });
+    expect(await store.acquireQrSlot('s6', 'ipD', now + 300, 10, 1)).toEqual({ ok: true });
+  });
+
+  it('QR slots: optimistic retry under contention, then gives up', async () => {
+    await store.acquireQrSlot('a', 'ip', Math.floor(Date.now() / 1000) + 300, 5, 5);
+    ddbMock.on(PutItemCommand).rejectsOnce(new ConditionalCheckFailedException({ message: 'c', $metadata: {} })).callsFake((i: { Item: Record<string, unknown> }) => {
+      table.set((i.Item.pk as { S: string }).S, i.Item as never);
+      return {};
+    });
+    expect(await store.acquireQrSlot('b', 'ip', Math.floor(Date.now() / 1000) + 300, 5, 5)).toEqual({ ok: true });
+    ddbMock.on(PutItemCommand).rejects(new ConditionalCheckFailedException({ message: 'c', $metadata: {} }));
+    expect(await store.acquireQrSlot('c', 'ip', Math.floor(Date.now() / 1000) + 300, 5, 5)).toEqual({ ok: false, reason: 'contention' });
+    ddbMock.on(PutItemCommand).rejects(new Error('boom'));
+    await expect(store.acquireQrSlot('d', 'ip', 1e10, 5, 5)).rejects.toThrow('boom');
+  });
 });

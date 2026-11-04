@@ -20,12 +20,14 @@
     "secret:set-im-app": "tsx scripts/secret-set-im-app.ts",
     "mint-test-token": "tsx scripts/mint-test-token.ts",
     "users": "tsx scripts/users.ts",
-    "gen:catalog": "tsx scripts/gen-catalog.ts"
+    "gen:catalog": "tsx scripts/gen-catalog.ts",
+    "teardown:extras": "tsx scripts/teardown-extras.ts"
   },
   "dependencies": {
     "@aws-crypto/sha256-js": "5.2.0",
     "@aws-sdk/client-cloudformation": "3.1161.0",
     "@aws-sdk/client-dynamodb": "3.1161.0",
+    "@aws-sdk/client-kms": "3.1161.0",
     "@aws-sdk/client-lambda": "3.1161.0",
     "@aws-sdk/client-secrets-manager": "3.1161.0",
     "@aws-sdk/client-ssm": "3.1161.0",

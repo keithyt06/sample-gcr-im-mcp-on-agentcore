@@ -1,0 +1,7 @@
+{
+  "_comment": "npm dist.integrity of each pinned IM CLI tarball (identical on registry.npmjs.org and registry.npmmirror.com). install-cli.sh refuses any tarball that does not match. Update with: npm view <pkg>@<version> dist.integrity",
+  "@larksuite/cli@1.0.99": "sha512-eUiGhjSEmeDu9w3741e1bF72LyYVtT5o+Dnb4SouTb52r6aRu2Us7QyZpcVdb5rfDvnPV4rPYWbGvvP1xFbp8w==",
+  "dingtalk-workspace-cli@1.0.67": "sha512-+nX57xvPnMa5/iS4MRm5N7tyjwe7GXrIChftgf5VhWpbMNhc4bl8ZWEXO1W4C7rRPE8w2buFGK+OhGyGNmOd9Q==",
+  "@wecom/cli@1.3.4": "sha512-vz47EsT/BKkHBONVt94xhZtUWhvMR4uF9Y4TTNUwF7PnLETqyFyrNNHwG3aTLmhMNC/ecqRWUUqvNgP90nreaQ==",
+  "@wecom/cli-linux-arm64@1.3.4": "sha512-BUvkJCMiM6aImK1MGjA6TuNslfay9eg/cOrmmvg3RLAlB9xTQUfqdq9YQxFog04wEpnlZSsgNXq6bWQaIvwX9w=="
+}

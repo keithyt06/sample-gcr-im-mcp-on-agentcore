@@ -138,7 +138,23 @@ describe('refresh', () => {
     expect(emfLines(out)).toEqual(['RefreshFailed']);
   });
 
-  it('dingtalk: HTTP 4xx → revoked', async () => {
+  it('dingtalk: 429 / app credential rejected keep the user secret (M-4)', async () => {
+    setEnv('dingtalk');
+    configureApp('dingclientid0001');
+    cred('a1', 5000);
+    cred('a2', 5000);
+    let f = fakeFetch([['userAccessToken', () => jsonResp(429, { code: 'Throttling' })]]);
+    expect(await runRefresh({ adapter: { fetch: f }, sleep })).toMatchObject({ failed: 2, revoked: 0 });
+    f = fakeFetch([['userAccessToken', () => jsonResp(401, { code: 'InvalidAuthentication' })]]);
+    expect(await runRefresh({ adapter: { fetch: f }, sleep })).toMatchObject({ failed: 2, revoked: 0 });
+    expect(secrets.get(`${PREFIX}/a1`)!.deleted).toBeFalsy();
+    expect(smMock.commandCalls(DeleteSecretCommand)).toHaveLength(0);
+    const logs = out.mock.calls.map((c) => JSON.parse(String(c[0])));
+    expect(logs.filter((l) => l.event === 'im_app_credential_rejected' && l.level === 'ERROR')).toHaveLength(2);
+    expect(emfLines(out)).toEqual(['RefreshFailed', 'RefreshFailed', 'RefreshFailed', 'RefreshFailed']);
+  });
+
+  it('dingtalk: explicit invalid grant → revoked', async () => {
     setEnv('dingtalk');
     configureApp('dingclientid0001');
     cred('dt', 5000);

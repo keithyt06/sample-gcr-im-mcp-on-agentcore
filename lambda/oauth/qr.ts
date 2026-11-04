@@ -1,10 +1,12 @@
 // GET /authorize/status (wecom QR flow), technical design §4.4. The QR session runs in
 // the user's microVM; this endpoint polls it via the `im/auth.status` control RPC.
+import { ENV } from '../../shared/contract';
+import { envOpt } from '../shared/env';
 import { json, query, type HttpEvent, type HttpResult } from '../shared/http';
 import { hashUserId, log } from '../shared/log';
 import { withParams } from '../shared/redirects';
 import { control } from '../shared/runtime-client';
-import { deleteFlow, disableUser, getFlow, getIdent, putCode, putUser, setIdent } from '../shared/store';
+import { consumeFlow, disableUser, getFlow, getIdent, getUser, putCode, putUser, releaseQrSlot, setIdent, userStatus, type UserRecord } from '../shared/store';
 import { newAuthCode } from '../shared/tokens';
 import { deleteCredential, describeCredential } from '../shared/user-secrets';
 
@@ -18,20 +20,47 @@ export interface AuthStatusResult {
   reason?: string;
 }
 
+export const requireApproval = (): boolean => envOpt(ENV.WECOM_REQUIRE_APPROVAL) === 'true';
+
+type SlotOutcome = 'active' | 'pending_approval' | 'revoked';
+
 /**
  * Converges repeated authorizations of the same WeCom person onto the newest slot:
  * the old slot U0 is disabled (replacedBy U1) and its credential is scheduled for deletion.
+ * - U0 revoked by the operator (disabled, no replacedBy) → deny; the mapping is kept and
+ *   the new slot is disabled and its credential deleted (M-2: revocation sticks).
+ * - WECOM_REQUIRE_APPROVAL=true: a new identity starts as approval='pending'; a replacement
+ *   slot inherits U0's approval (approved users are unaffected).
  */
-async function resolveSlot(userId: string, wecomUserId: string | undefined): Promise<void> {
+async function resolveSlot(userId: string, wecomUserId: string | undefined): Promise<SlotOutcome> {
   const now = Math.floor(Date.now() / 1000);
+  const approval = requireApproval();
+  const base: UserRecord = { im: 'wecom', createdAt: now, lastLoginAt: now };
   if (!wecomUserId) {
+    // No identity: we can't dedupe or check revocation. Fail closed when approval is required.
     log('WARN', 'qr_identity_unknown', { userIdHash: hashUserId(userId) });
-    await putUser(userId, { im: 'wecom', createdAt: now, lastLoginAt: now });
-    return;
+    await putUser(userId, { ...base, ...(approval ? { approval: 'pending' } : {}) });
+    return approval ? 'pending_approval' : 'active';
   }
   const prev = await getIdent('wecom', wecomUserId);
-  await putUser(userId, { im: 'wecom', imUid: wecomUserId, createdAt: now, lastLoginAt: now });
-  if (prev === userId) return;
+  if (prev === userId) {
+    const u = await getUser(userId);
+    return userStatus(u) === 'pending_approval' ? 'pending_approval' : 'active';
+  }
+  const prevUser = prev ? await getUser(prev) : null;
+  if (prev && userStatus(prevUser) === 'revoked') {
+    log('WARN', 'qr_revoked_identity_denied', { userIdHash: hashUserId(prev), newHash: hashUserId(userId) });
+    await putUser(userId, { ...base, imUid: wecomUserId, disabled: true });
+    try {
+      await deleteCredential(userId, 7);
+    } catch (e) {
+      log('WARN', 'qr_new_slot_delete_failed', { userIdHash: hashUserId(userId), error: e instanceof Error ? e.name : 'unknown' });
+    }
+    return 'revoked';
+  }
+  // Pending unless an existing slot was already approved (absent approval = approved).
+  const pending = approval && (!prev || userStatus(prevUser) === 'pending_approval');
+  await putUser(userId, { ...base, imUid: wecomUserId, ...(pending ? { approval: 'pending' } : {}) });
   await setIdent('wecom', wecomUserId, userId);
   if (prev) {
     await disableUser(prev, userId);
@@ -44,6 +73,7 @@ async function resolveSlot(userId: string, wecomUserId: string | undefined): Pro
   } else {
     log('INFO', 'identity_slot_registered', { userIdHash: hashUserId(userId) });
   }
+  return pending ? 'pending_approval' : 'active';
 }
 
 export async function authorizeStatus(event: HttpEvent): Promise<HttpResult> {
@@ -81,11 +111,20 @@ export async function authorizeStatus(event: HttpEvent): Promise<HttpResult> {
   }
   if (!authorized) {
     const status = ['pending', 'expired', 'failed'].includes(st.status) ? st.status : 'pending';
+    if (status !== 'pending') await releaseQrSlot(flowId).catch(() => undefined);
     return json(200, { status, ...(st.reason ? { reason: st.reason } : {}) });
   }
 
-  await resolveSlot(userId, wecomUserId);
-  await deleteFlow(flowId);
+  // Single-use: only one concurrent poll may complete the flow (L-2).
+  const claimed = await consumeFlow(flowId);
+  await releaseQrSlot(flowId).catch(() => undefined);
+  if (!claimed) return json(200, { status: 'expired' });
+  const outcome = await resolveSlot(userId, wecomUserId);
+  if (outcome === 'revoked') return json(200, { status: 'failed', reason: 'access_revoked' });
+  if (outcome === 'pending_approval') {
+    log('INFO', 'qr_pending_approval', { userIdHash: hashUserId(userId) });
+    return json(200, { status: 'pending_approval', reason: 'pending_approval' });
+  }
   const code = newAuthCode();
   await putCode(code, { userId, clientId: flow.clientId, redirectUri: flow.redirectUri, codeChallenge: flow.codeChallenge });
   log('INFO', 'qr_authorized', { userIdHash: hashUserId(userId) });

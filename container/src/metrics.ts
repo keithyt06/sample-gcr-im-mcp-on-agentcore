@@ -1,4 +1,5 @@
 // CloudWatch Embedded Metric Format (technical design §6.4, R6).
+import { createHash } from 'node:crypto';
 import type { MetricName } from '../../shared/contract';
 
 let configuredNamespace: string | undefined;
@@ -24,4 +25,9 @@ export function log(level: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL', event: string
   const line = JSON.stringify({ level, event, ...fields });
   if (level === 'INFO') process.stdout.write(`${line}\n`);
   else process.stderr.write(`${line}\n`);
+}
+
+/** 16 hex chars of sha256, same as lambda/shared/log.ts hashUserId: correlatable, not the raw id (review L-4). */
+export function hashUserId(userId: string): string {
+  return createHash('sha256').update(userId).digest('hex').slice(0, 16);
 }

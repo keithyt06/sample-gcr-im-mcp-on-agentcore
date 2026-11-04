@@ -220,8 +220,11 @@ Alarms (CloudWatch, optional SNS topic from config; none exist today in either C
       `aws secretsmanager delete-secret --secret-id <name> --force-delete-without-recovery`
       (otherwise the name stays reserved for 7–30 days and the next deploy with the same prefix fails).
       List with `list-secrets --filters Key=name,Values=<prefix>/`.
-- [ ] KMS: confirm the CMK is `PendingDeletion` (minimum 7-day window; set
-      `pendingWindow: 7` in CDK). Do not reuse the alias until deletion completes, or use a new prefix.
+- [ ] KMS: the CMK is `RemovalPolicy.RETAIN` (about USD 1/month until deleted). Schedule its deletion
+      (`aws kms schedule-key-deletion --pending-window-in-days 7`) and confirm it is `PendingDeletion`.
+      The alias is removed by `cdk destroy`; the key is found by tag `im-mcp:slug=<slug>`.
+- [ ] Shortcut for the two items above: `npm run teardown:extras -- -c config=<path>` force-deletes
+      `<slug>/users/*` and schedules the CMK deletion (asks for the slug as confirmation; `--yes` skips it).
 - [ ] ECR: delete the image tags/digests this deployment pushed to the CDK assets repo
       (`aws ecr batch-delete-image`); keep the shared `gcr-im-mcp/base/node` mirror.
 - [ ] AgentCore: `list-agent-runtimes` shows none of ours; delete leftover workload identities.

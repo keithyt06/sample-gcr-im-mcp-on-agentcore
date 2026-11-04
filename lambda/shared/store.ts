@@ -48,6 +48,17 @@ export interface UserRecord {
   lastLoginAt: number;
   disabled?: boolean;
   replacedBy?: string;
+  /** WeCom operator approval. Absent = approved (existing users and redirect IMs are unaffected). */
+  approval?: 'pending' | 'approved';
+  approvedAt?: number;
+}
+
+/** Status precedence: revoked (disabled) > replaced > pending_approval > active. */
+export function userStatus(u: UserRecord | null): 'revoked' | 'replaced' | 'pending_approval' | 'active' {
+  if (u?.disabled && !u.replacedBy) return 'revoked';
+  if (u?.replacedBy) return 'replaced';
+  if (u?.approval === 'pending') return 'pending_approval';
+  return 'active';
 }
 
 type Item = Record<string, AttributeValue>;
@@ -92,9 +103,12 @@ function unmarshal<T>(item: Item | undefined): (T & { ttl?: number }) | null {
   return o as T & { ttl?: number };
 }
 
-async function put(pk: string, o: object, ttl?: number, condition?: string): Promise<void> {
+async function put(pk: string, o: object, ttl?: number, condition?: string, expectVersion?: number): Promise<void> {
+  const versioned = expectVersion !== undefined
+    ? { ConditionExpression: 'v = :v', ExpressionAttributeValues: { ':v': { N: String(expectVersion) } } }
+    : {};
   await ddb.send(
-    new PutItemCommand({ TableName: table(), Item: marshal(pk, o, ttl), ...(condition ? { ConditionExpression: condition } : {}) }),
+    new PutItemCommand({ TableName: table(), Item: marshal(pk, o, ttl), ...(condition ? { ConditionExpression: condition } : {}), ...versioned }),
   );
 }
 
@@ -144,17 +158,31 @@ export async function consumeCode(code: string): Promise<CodeRecord | null> {
 // its exp as a tombstone) and issues a new token in the same family. Presenting a used
 // token again (replay) deletes the family, which invalidates every token derived from it.
 
-export async function putRefresh(rt: string, rec: Omit<RefreshRecord, 'exp'>, isNewFamily: boolean): Promise<void> {
+/**
+ * Stores a rotated/new refresh token. When extending an existing family the update is
+ * conditional on the family still existing, so a concurrent replay revocation can't be
+ * undone by the upsert. Returns false if the family is gone (caller → invalid_grant).
+ */
+export async function putRefresh(rt: string, rec: Omit<RefreshRecord, 'exp'>, isNewFamily: boolean): Promise<boolean> {
   const exp = nowSec() + REFRESH_TTL_SEC;
   if (isNewFamily) await put(`rfam#${rec.family}`, { userId: rec.userId }, exp);
-  else await ddb.send(new UpdateItemCommand({
-    TableName: table(),
-    Key: { pk: { S: `rfam#${rec.family}` } },
-    UpdateExpression: 'SET #t = :t',
-    ExpressionAttributeNames: { '#t': 'ttl' },
-    ExpressionAttributeValues: { ':t': { N: String(exp) } },
-  }));
+  else {
+    try {
+      await ddb.send(new UpdateItemCommand({
+        TableName: table(),
+        Key: { pk: { S: `rfam#${rec.family}` } },
+        UpdateExpression: 'SET #t = :t',
+        ConditionExpression: 'attribute_exists(pk)',
+        ExpressionAttributeNames: { '#t': 'ttl' },
+        ExpressionAttributeValues: { ':t': { N: String(exp) } },
+      }));
+    } catch (e) {
+      if (e instanceof ConditionalCheckFailedException) return false;
+      throw e;
+    }
+  }
   await put(`refresh#${sha256Hex(rt)}`, { ...rec, exp }, exp);
+  return true;
 }
 
 export type ConsumeRefreshResult = { ok: true; rec: RefreshRecord } | { ok: false; reason: 'unknown' | 'expired' | 'replay' | 'revoked' };
@@ -241,4 +269,46 @@ export async function disableUser(userId: string, replacedBy?: string): Promise<
     UpdateExpression: replacedBy ? 'SET disabled = :t, replacedBy = :r' : 'SET disabled = :t',
     ExpressionAttributeValues: { ':t': { BOOL: true }, ...(replacedBy ? { ':r': { S: replacedBy } } : {}) },
   }));
+}
+
+// ---- pending WeCom QR sessions (H-1: bound microVM amplification) ----
+// One item `qrpending` holds `entries: ["<exp>:<state>:<ipHash>", ...]` plus a version
+// counter. Acquire/release are optimistic read-modify-writes (condition on the version),
+// and expired entries are pruned on every write, so the pool self-heals without a sweeper.
+
+const QR_PK = 'qrpending';
+const QR_ATTEMPTS = 4;
+
+export type QrAcquire = { ok: true } | { ok: false; reason: 'global' | 'source' | 'contention' };
+
+async function qrUpdate(mutate: (live: string[]) => string[] | QrAcquire): Promise<QrAcquire> {
+  for (let i = 0; i < QR_ATTEMPTS; i++) {
+    const cur = await get<{ entries?: string[]; v?: number }>(QR_PK);
+    const now = nowSec();
+    const live = (cur?.entries ?? []).filter((e) => Number(e.split(':')[0]) > now);
+    const next = mutate(live);
+    if (!Array.isArray(next)) return next;
+    const v = cur?.v ?? 0;
+    try {
+      await put(QR_PK, { entries: next, v: v + 1 }, undefined, cur ? undefined : 'attribute_not_exists(pk)', cur ? v : undefined);
+      return { ok: true };
+    } catch (e) {
+      if (!(e instanceof ConditionalCheckFailedException)) throw e;
+    }
+  }
+  return { ok: false, reason: 'contention' };
+}
+
+/** Reserves a pending-QR slot for `state` until `exp` (epoch s). */
+export function acquireQrSlot(state: string, sourceHash: string, exp: number, maxGlobal: number, maxPerSource: number): Promise<QrAcquire> {
+  return qrUpdate((live) => {
+    if (live.length >= maxGlobal) return { ok: false, reason: 'global' };
+    if (live.filter((e) => e.endsWith(`:${sourceHash}`)).length >= maxPerSource) return { ok: false, reason: 'source' };
+    return [...live, `${exp}:${state}:${sourceHash}`];
+  });
+}
+
+/** Best-effort release; an unreleased slot expires on its own. */
+export async function releaseQrSlot(state: string): Promise<void> {
+  await qrUpdate((live) => live.filter((e) => e.split(':')[1] !== state));
 }

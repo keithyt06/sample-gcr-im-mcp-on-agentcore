@@ -6,7 +6,7 @@ export interface HttpEvent {
   rawQueryString?: string;
   headers?: Record<string, string | undefined>;
   queryStringParameters?: Record<string, string | undefined>;
-  requestContext: { requestId?: string; http: { method: string; path?: string } };
+  requestContext: { requestId?: string; http: { method: string; path?: string; sourceIp?: string } };
   body?: string;
   isBase64Encoded?: boolean;
 }

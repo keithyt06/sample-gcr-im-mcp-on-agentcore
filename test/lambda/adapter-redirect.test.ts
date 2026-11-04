@@ -127,10 +127,28 @@ describe('dingtalk', () => {
     await expect(ding(fakeFetch([['userAccessToken', () => new Response('<html/>')]])).exchangeCode({ code: 'c', callbackUrl: 'x', app })).rejects.toBeInstanceOf(ImUpstreamError);
   });
 
+  it.each([
+    [400, { code: 'invalidGrant' }, true, false],
+    [400, { code: 'InvalidParameter.RefreshToken.Invalid' }, true, false],
+    [401, { code: 'invalidParameter.authCode.notFound' }, true, false],
+    [400, {}, false, false],
+    [400, { code: 'unknownThing' }, false, false],
+    [403, { code: 'invalidGrant' }, false, false],
+    [429, { code: 'Throttling' }, false, false],
+    [408, {}, false, false],
+    [401, { code: 'InvalidAuthentication' }, false, true],
+    [400, { code: 'invalidClientSecret' }, false, true],
+    [403, { code: 'Forbidden.AccessDenied.AppKey' }, false, true],
+  ])('refresh HTTP %i %j → revoked=%s appRejected=%s (M-4)', async (status, b, revoked, appRejected) => {
+    const r = await ding(fakeFetch([['userAccessToken', () => jsonResp(status, b)]])).refresh({ refreshToken: 'r', app });
+    expect(r).toMatchObject({ ok: false, revoked });
+    expect(!!(r as { appRejected?: boolean }).appRejected).toBe(appRejected);
+  });
+
   it('refresh: success, 4xx revoked, 5xx transient, bad body, network', async () => {
     const mk = (resp: () => Response) => ding(fakeFetch([['userAccessToken', resp]]));
     expect(await mk(() => jsonResp(200, { accessToken: 'n', refreshToken: 'r2', expiresIn: 10 })).refresh({ refreshToken: 'r', app })).toMatchObject({ ok: true, tokens: { accessToken: 'n', refreshToken: 'r2' } });
-    expect(await mk(() => jsonResp(400, {})).refresh({ refreshToken: 'r', app })).toEqual({ ok: false, revoked: true, reason: 'http_400' });
+    expect(await mk(() => jsonResp(400, { code: 'invalidGrant' })).refresh({ refreshToken: 'r', app })).toEqual({ ok: false, revoked: true, reason: 'http_400:invalidGrant' });
     expect(await mk(() => jsonResp(503, {})).refresh({ refreshToken: 'r', app })).toEqual({ ok: false, revoked: false, reason: 'http_503' });
     expect(await mk(() => new Response('x')).refresh({ refreshToken: 'r', app })).toMatchObject({ ok: false, revoked: false });
     expect(await mk(() => { throw new TypeError('net'); }).refresh({ refreshToken: 'r', app })).toMatchObject({ ok: false, revoked: false });

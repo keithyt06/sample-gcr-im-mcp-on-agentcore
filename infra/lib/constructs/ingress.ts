@@ -75,7 +75,10 @@ export class Ingress extends Construct {
     // RouteSettings refers to the route key, so the stage must be created after every route.
     for (const r of routes) stage.node.addDependency(r);
     stage.defaultRouteSettings = { throttlingRateLimit: rl.rps, throttlingBurstLimit: rl.burst };
-    stage.routeSettings = { 'POST /register': { ThrottlingRateLimit: rl.registerRps, ThrottlingBurstLimit: rl.registerBurst } };
+    stage.routeSettings = {
+      'POST /register': { ThrottlingRateLimit: rl.registerRps, ThrottlingBurstLimit: rl.registerBurst },
+      'GET /authorize': { ThrottlingRateLimit: rl.authorizeRps, ThrottlingBurstLimit: rl.authorizeBurst },
+    };
     stage.accessLogSettings = {
       destinationArn: accessLogs.logGroupArn,
       format: JSON.stringify({

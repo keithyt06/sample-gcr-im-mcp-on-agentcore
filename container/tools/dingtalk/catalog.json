@@ -1,7 +1,7 @@
 {
  "family": "dingtalk",
  "cliVersion": "1.0.67",
- "generatedAt": "2026-11-04T18:19:31.313Z",
+ "generatedAt": "2026-11-04T19:32:25.868Z",
  "tools": [
   {
    "name": "agoal_contract_fields",
@@ -2314,7 +2314,8 @@
     ],
     "supportsYes": true
    },
-   "category": "aitable"
+   "category": "aitable",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "aitable_attachment_remove",
@@ -7411,10 +7412,6 @@
       "type": "string",
       "description": "HTTPS 封面地址；主机名仅允许 img.alicdn.com、static.dingtalk.com、down-cdn.dingtalk.com、alidocs.oss-cn-zhangjiakou.aliyuncs.com、alidocs2.oss-cn-zhangjiakou.aliyuncs.com、alidocs.oss-cn-hangzhou.aliyuncs.com（精确匹配，不含子域名），仅默认端口或 443；其他图片需先上传为当前 Base 的图片资源；省略不修改，空值/空白值不支持清除；禁止空白、未编码的引号/括号、鉴权信息、查询参数、片段及 /core/api/resources 内部路径；文件名中的引号/括号须百分号编码；仅校验 URL 结构，不验证可访问性或图片内容；与本地文件/资源 ID 互斥"
      },
-     "form_cover_file": {
-      "type": "string",
-      "description": "本地 PNG/JPEG/GIF 图片，不超过 10 MiB"
-     },
      "form_cover_resource_id": {
       "type": "string",
       "description": "当前 Base 已上传的非空图片资源 ID，不含首尾空白；服务端按当前身份转为公开封面，转存 URL 须满足 form-cover 的可信域名、端口及格式限制；权限或资源校验失败不更新配置，公开操作无法随后续配置失败回滚；先回读配置，已有符合限制的目标公开 URL 时人工核验后使用 form-cover"
@@ -7533,12 +7530,6 @@
       "required": false
      },
      {
-      "name": "form-cover-file",
-      "key": "form_cover_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "form-cover-resource-id",
       "key": "form_cover_resource_id",
       "type": "string",
@@ -7643,10 +7634,6 @@
       "type": "string",
       "description": "所属 Base ID (必填)"
      },
-     "qr_file": {
-      "type": "string",
-      "description": "本地 PNG 二维码输出路径"
-     },
      "table_id": {
       "type": "string",
       "description": "所属 Table ID (必填)"
@@ -7677,12 +7664,6 @@
       "key": "base_id",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "qr-file",
-      "key": "qr_file",
-      "type": "string",
-      "required": false
      },
      {
       "name": "table-id",
@@ -8020,7 +8001,8 @@
     ],
     "supportsYes": true
    },
-   "category": "aitable"
+   "category": "aitable",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "aitable_import_upload",
@@ -8611,10 +8593,6 @@
       "type": "string",
       "description": "待创建的记录列表 JSON 数组，单次最多 100 条 (必填)"
      },
-     "records_file": {
-      "type": "string",
-      "description": "从文件读取 records JSON（替代 --records，适合 Windows 或超长数据）"
-     },
      "table_id": {
       "type": "string",
       "description": "Table ID，可通过 base get 获取 (必填)"
@@ -8654,12 +8632,6 @@
       "required": true
      },
      {
-      "name": "records-file",
-      "key": "records_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "table-id",
       "key": "table_id",
       "type": "string",
@@ -8691,10 +8663,6 @@
      "records": {
       "type": "string",
       "description": "待创建的子记录 JSON 数组，单次 1～100 条 (必填，可改用 --records-file)"
-     },
-     "records_file": {
-      "type": "string",
-      "description": "从文件读取 records JSON（替代 --records）"
      },
      "table_id": {
       "type": "string",
@@ -8744,12 +8712,6 @@
       "key": "records",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "records-file",
-      "key": "records_file",
-      "type": "string",
-      "required": false
      },
      {
       "name": "table-id",
@@ -8912,7 +8874,8 @@
     ],
     "supportsYes": true
    },
-   "category": "aitable"
+   "category": "aitable",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "aitable_record_get",
@@ -9855,10 +9818,6 @@
       "type": "string",
       "description": "待更新的记录内容列表 JSON 数组，单次最多 100 条 (必填)"
      },
-     "records_file": {
-      "type": "string",
-      "description": "从文件读取 records JSON（替代 --records，适合 Windows 或超长数据）"
-     },
      "table_id": {
       "type": "string",
       "description": "Table ID，可通过 base get 获取 (必填)"
@@ -9892,12 +9851,6 @@
       "required": true
      },
      {
-      "name": "records-file",
-      "key": "records_file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "table-id",
       "key": "table_id",
       "type": "string",
@@ -9925,10 +9878,6 @@
      "records": {
       "type": "string",
       "description": "待 upsert 的记录内容列表 JSON 数组，单次最多 100 条；带 recordId 的走更新，不带的走创建 (必填，可改用 --records-file)"
-     },
-     "records_file": {
-      "type": "string",
-      "description": "从文件读取 records JSON（避免命令行长度限制）；与 --records 互斥，优先级更高"
      },
      "table_id": {
       "type": "string",
@@ -9967,12 +9916,6 @@
       "key": "records",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "records-file",
-      "key": "records_file",
-      "type": "string",
-      "required": false
      },
      {
       "name": "table-id",
@@ -14443,10 +14386,6 @@
       "type": "string",
       "description": "HTTPS 封面地址；主机名仅允许 img.alicdn.com、static.dingtalk.com、down-cdn.dingtalk.com、alidocs.oss-cn-zhangjiakou.aliyuncs.com、alidocs2.oss-cn-zhangjiakou.aliyuncs.com、alidocs.oss-cn-hangzhou.aliyuncs.com（精确匹配，不含子域名），仅默认端口或 443；其他图片需先上传为当前 Base 的图片资源；省略不修改，空值/空白值不支持清除；禁止空白、未编码的引号/括号、鉴权信息、查询参数、片段及 /core/api/resources 内部路径；文件名中的引号/括号须百分号编码；仅校验 URL 结构，不验证可访问性或图片内容；与本地文件/资源 ID 互斥"
      },
-     "form_cover_file": {
-      "type": "string",
-      "description": "本地 PNG/JPEG/GIF 图片，最大 10 MiB；上传后同步页面与分享卡片"
-     },
      "form_cover_resource_id": {
       "type": "string",
       "description": "当前 Base 已上传的非空图片资源 ID，不含首尾空白；服务端按当前身份转为公开封面，转存 URL 须满足 form-cover 的可信域名、端口及格式限制；权限或资源校验失败不更新配置，公开操作无法随后续配置失败回滚；先回读配置，已有符合限制的目标公开 URL 时人工核验后使用 form-cover"
@@ -14567,12 +14506,6 @@
      {
       "name": "form-cover",
       "key": "form_cover",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "form-cover-file",
-      "key": "form_cover_file",
       "type": "string",
       "required": false
      },
@@ -15240,10 +15173,6 @@
       "type": "string",
       "description": "分页游标（可选）；首次不传，后续只能原样使用上一页 data.nextCursor，并保持全部查询条件不变；普通扫描满 limit 后成功返回空续页属于正常情况，records 为空时仍以 nextCursor 是否为空判断继续或完成；不得复用旧 cursor 或自行构造。INVALID_CURSOR/CURSOR_SNAPSHOT_CHANGED 必须丢弃累计结果与旧游标，不传 --cursor 从第一页只读重查；CURSOR_SNAPSHOT_UNAVAILABLE 先等待服务修复；CURSOR_OFFSET_LIMIT 表示排序 offset 已达上限（100000），须先收窄 --filters（或改用 --record-ids/分段条件）再从第一页重查，直接重查会再次触顶。失效快照不提供续传 cursor，不按 recordId 去重拼接新旧页，也不重跑含写入的整条命令；兼容别名与主参数同时提供时值必须一致"
      },
-     "export_output": {
-      "type": "string",
-      "description": "将完整结果写成 NDJSON 文件并返回哈希、行数和列信息；必须 --all，路径限工作目录内，不覆盖已有文件；全局 --output/-o 仍用于保存命令返回值"
-     },
      "field_ids": {
       "type": "array",
       "items": {
@@ -15315,12 +15244,6 @@
      {
       "name": "cursor",
       "key": "cursor",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "export-output",
-      "key": "export_output",
       "type": "string",
       "required": false
      },
@@ -28010,10 +27933,6 @@
       "type": "boolean",
       "description": "不输出消息 reaction（默认输出）"
      },
-     "output_dir": {
-      "type": "string",
-      "description": "资源输出目录；必须是工作目录内的相对路径，禁止绝对路径和 .. 逃逸"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "允许覆盖工作目录内已存在的本地输出文件（默认拒绝）"
@@ -28080,12 +27999,6 @@
       "name": "no-reactions",
       "key": "no_reactions",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
-      "type": "string",
       "required": false
      },
      {
@@ -28680,7 +28593,7 @@
      "group"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -29720,14 +29633,6 @@
       ],
       "description": "结果及范围遍历顺序 asc/desc（可选，默认 desc；群聊asc未给start时按已验证创建时间起读；单聊asc仍需start）（可选值: asc, desc）"
      },
-     "output": {
-      "type": "string",
-      "description": "把完整结构化 ledger 原子写入工作目录内的相对 JSON 文件"
-     },
-     "output_dir": {
-      "type": "string",
-      "description": "资源输出目录；必须是工作目录内的相对路径，禁止绝对路径和 .. 逃逸"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "允许覆盖工作目录内已存在的本地输出文件（默认拒绝）"
@@ -29869,18 +29774,6 @@
      {
       "name": "order",
       "key": "order",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
       "type": "string",
       "required": false
      },
@@ -31168,7 +31061,7 @@
     "type": "object",
     "properties": {}
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -31223,7 +31116,7 @@
      }
     }
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -31422,7 +31315,8 @@
     ],
     "supportsYes": true
    },
-   "category": "chat"
+   "category": "chat",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "chat_conversation_hide",
@@ -31869,10 +31763,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "输入文件路径；- 表示 stdin"
-     },
      "layer": {
       "type": "string",
       "enum": [
@@ -31897,12 +31787,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "layer",
       "key": "layer",
@@ -32069,10 +31953,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file_path": {
-      "type": "string",
-      "description": "本地图片路径 (jpg/jpeg/png/gif/webp/bmp，≤10MB；超过2MB会先自动压缩)；与 --media-id 二选一必填"
-     },
      "media_id": {
       "type": "string",
       "description": "待收藏 mediaId；与 --file-path 二选一必填"
@@ -32100,12 +31980,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file-path",
-      "key": "file_path",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "media-id",
       "key": "media_id",
@@ -33527,7 +33401,7 @@
      "id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -34024,7 +33898,7 @@
      "conversation_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -34237,7 +34111,7 @@
      "role_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -34288,7 +34162,7 @@
      "user"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -34648,7 +34522,7 @@
      "conversation_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -35735,7 +35609,8 @@
     ],
     "supportsYes": true
    },
-   "category": "chat"
+   "category": "chat",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "chat_message_edit",
@@ -36925,7 +36800,7 @@
      "message_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -36979,7 +36854,7 @@
      "robot_code"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -37062,7 +36937,7 @@
      "msg_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -37144,7 +37019,7 @@
      "open_message_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -37230,7 +37105,7 @@
      "text"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -37785,10 +37660,6 @@
       "type": "string",
       "description": "群聊 openconversation_id（群聊时必填）"
      },
-     "file": {
-      "type": "string",
-      "description": "本地文件路径（msgType=file/audio/video 时直接上传并按 file 消息发送）"
-     },
      "group": {
       "type": "string",
       "description": "--conversation-id 的别名"
@@ -37883,12 +37754,6 @@
      {
       "name": "conversation-id",
       "key": "conversation_id",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
       "type": "string",
       "required": false
      },
@@ -38103,10 +37968,6 @@
       "type": "string",
       "description": "群聊 openConversationId（群聊时必填）"
      },
-     "file_path": {
-      "type": "string",
-      "description": "本地文件路径（msgType=file 时直接上传并按 file 消息发送）"
-     },
      "group": {
       "type": "string",
       "description": "--conversation-id 的别名"
@@ -38187,12 +38048,6 @@
      {
       "name": "conversation-id",
       "key": "conversation_id",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file-path",
-      "key": "file_path",
       "type": "string",
       "required": false
      },
@@ -39837,10 +39692,6 @@
       "type": "boolean",
       "description": "跳过 Thread 回复补查（默认每个 Thread 最多 10 条、总计最多 500 条；需要完整回复请用 +thread-replies）"
      },
-     "output_dir": {
-      "type": "string",
-      "description": "资源输出目录；必须是工作目录内的相对路径，禁止绝对路径和 .. 逃逸"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "允许覆盖工作目录内已存在的本地输出文件（默认拒绝）"
@@ -39880,12 +39731,6 @@
       "name": "no-threads",
       "key": "no_threads",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
-      "type": "string",
       "required": false
      },
      {
@@ -40574,7 +40419,8 @@
     ],
     "supportsYes": true
    },
-   "category": "chat"
+   "category": "chat",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "chat_messages_resource_url",
@@ -40724,14 +40570,6 @@
       "type": "number",
       "description": "群邀请有效期秒数，0 为永久；仅 share-chat 使用"
      },
-     "file": {
-      "type": "string",
-      "description": "工作目录内安全相对文件路径（user 的 file/audio/video；bot 仅单目标 file）"
-     },
-     "file_path": {
-      "type": "string",
-      "description": "--file 的兼容别名"
-     },
      "group": {
       "type": "string",
       "description": "群 openConversationId（user/bot 群聊）；受发送身份能力矩阵约束"
@@ -40742,10 +40580,6 @@
        "type": "string"
       },
       "description": "多个群 openConversationId（仅 bot；受发送身份能力矩阵约束，逐群返回 typed ledger，最多 100 个）"
-     },
-     "groups_file": {
-      "type": "string",
-      "description": "工作目录内相对文本文件（仅 bot；受发送身份能力矩阵约束），每行或逗号分隔一个群 openConversationId"
      },
      "idempotency_key": {
       "type": "string",
@@ -40950,18 +40784,6 @@
       "required": false
      },
      {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "file-path",
-      "key": "file_path",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "group",
       "key": "group",
       "type": "string",
@@ -40971,12 +40793,6 @@
       "name": "groups",
       "key": "groups",
       "type": "stringArray",
-      "required": false
-     },
-     {
-      "name": "groups-file",
-      "key": "groups_file",
-      "type": "string",
       "required": false
      },
      {
@@ -42231,10 +42047,6 @@
       ],
       "description": "按消息创建时间稳定排列输出 asc/desc（可选，默认 desc）（可选值: asc, desc）"
      },
-     "output_dir": {
-      "type": "string",
-      "description": "资源输出目录；必须是工作目录内的相对路径，禁止绝对路径和 .. 逃逸"
-     },
      "overwrite": {
       "type": "boolean",
       "description": "允许覆盖工作目录内已存在的本地输出文件（默认拒绝）"
@@ -42439,12 +42251,6 @@
      {
       "name": "order",
       "key": "order",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
       "type": "string",
       "required": false
      },
@@ -43462,7 +43268,7 @@
      "message_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -43513,7 +43319,7 @@
      "message_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -43585,7 +43391,7 @@
      "text"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "chat",
@@ -43668,10 +43474,6 @@
        "desc"
       ],
       "description": "回复输出顺序 asc/desc（可选，默认 desc；asc 必须与 --page-all 一起使用）（可选值: asc, desc）"
-     },
-     "output_dir": {
-      "type": "string",
-      "description": "资源输出目录；必须是工作目录内的相对路径，禁止绝对路径和 .. 逃逸"
      },
      "overwrite": {
       "type": "boolean",
@@ -43760,12 +43562,6 @@
      {
       "name": "order",
       "key": "order",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
       "type": "string",
       "required": false
      },
@@ -43860,10 +43656,6 @@
       "type": "string",
       "description": "Thread 子会话 openConvThreadId (必填)"
      },
-     "file": {
-      "type": "string",
-      "description": "本地文件路径（msgType=file/audio/video 时直接上传并按 file 消息发送）"
-     },
      "idempotency_key": {
       "type": "string",
       "description": "幂等键，相同 key 在 24h 内不会重复发送"
@@ -43931,12 +43723,6 @@
       "required": true
      },
      {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
-     {
       "name": "idempotency-key",
       "key": "idempotency_key",
       "type": "string",
@@ -43990,10 +43776,6 @@
      "conversation_id": {
       "type": "string",
       "description": "父会话 openConversationId (必填)"
-     },
-     "file": {
-      "type": "string",
-      "description": "本地文件路径（msgType=file/audio/video 时直接上传并按 file 消息发送）"
      },
      "idempotency_key": {
       "type": "string",
@@ -44060,12 +43842,6 @@
       "key": "conversation_id",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
      },
      {
       "name": "idempotency-key",
@@ -47493,7 +47269,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "contract_account_delete",
@@ -47740,7 +47517,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "contract_archive",
@@ -47774,7 +47552,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "contract_draft",
@@ -48758,7 +48537,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "contract_record_get",
@@ -48922,7 +48702,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "contract_subject_auto_fill",
@@ -49505,7 +49286,8 @@
     ],
     "supportsYes": true
    },
-   "category": "contract"
+   "category": "contract",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "devdoc_article_search",
@@ -49620,7 +49402,7 @@
      "robot_code"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "ding",
@@ -49894,7 +49676,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "dingtalk_tag_capability_mcp_delete",
@@ -50066,10 +49849,6 @@
       "type": "string",
       "description": "目标数字员工 UUID（MCP 资源 tenant）"
      },
-     "config_file": {
-      "type": "string",
-      "description": "可选本地 JSON 文件；configString 内 mcpServers.<名称>.type 必须显式填写 streamable-http 或 sse；字段展开到工具根节点，不对应单个 config 属性"
-     },
      "enabled": {
       "type": "boolean",
       "description": "启用状态 true|false；不传保持原值（草稿态，不自动发布）"
@@ -50099,12 +49878,6 @@
       "key": "agent_uuid",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "config-file",
-      "key": "config_file",
-      "type": "string",
-      "required": false
      },
      {
       "name": "enabled",
@@ -50168,7 +49941,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "dingtalk_tag_capability_skill_delete",
@@ -50342,10 +50116,6 @@
       "type": "boolean",
       "description": "启用状态 true|false；不传保持原值（草稿态，不自动发布）；不能与 --file 同时使用"
      },
-     "file": {
-      "type": "string",
-      "description": "可选本地 ZIP；CLI 上传后以 fileUrl 下发，ZIP 不进入 MCP JSON"
-     },
      "skill_id": {
       "type": "string",
       "description": "Skill ID"
@@ -50376,12 +50146,6 @@
       "name": "enabled",
       "key": "enabled",
       "type": "bool",
-      "required": false
-     },
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
       "required": false
      },
      {
@@ -50858,7 +50622,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_connect_list",
@@ -50878,7 +50643,8 @@
     "flags": [],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_connect_restart",
@@ -50913,7 +50679,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_connect_status",
@@ -50948,7 +50715,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_connect_stop",
@@ -50983,7 +50751,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_connect_unbind",
@@ -51028,7 +50797,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_manage_create",
@@ -51329,7 +51099,8 @@
     ],
     "supportsYes": true
    },
-   "category": "dingtalk-tag"
+   "category": "dingtalk-tag",
+   "unavailable": "starts a local process, daemon or long-running listener; never exposed by this server"
   },
   {
    "name": "dingtalk_tag_manage_publish",
@@ -53251,10 +53022,6 @@
       "type": "string",
       "description": "文档初始内容（短文本字面量）；传 - 表示从 stdin 读取"
      },
-     "content_file": {
-      "type": "string",
-      "description": "从文件读取文档内容（UTF-8）。推荐长/多行/表格内容使用"
-     },
      "content_format": {
       "type": "string",
       "description": "内容格式: 默认为 markdown，可选 jsonml"
@@ -53291,12 +53058,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "content-file",
-      "key": "content_file",
       "type": "string",
       "required": false
      },
@@ -53509,7 +53270,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_delete",
@@ -53633,7 +53395,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_download_overwrite",
@@ -53702,7 +53465,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_export",
@@ -53771,7 +53535,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_export_get",
@@ -54554,7 +54319,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_import_get",
@@ -54930,7 +54696,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_media_list",
@@ -54976,10 +54743,6 @@
       "type": "string",
       "description": "文档 ID 或 URL；兼容别名与主参数同时提供时值必须一致（必填）"
      },
-     "output": {
-      "type": "string",
-      "description": "可选：持久保存到工作目录内相对路径；不传使用临时目录"
-     },
      "resource_id": {
       "type": "string",
       "description": "附件 resourceId；--resource-id 必须是附件回执返回的 UUID（必填）"
@@ -55003,12 +54766,6 @@
       "key": "node",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
-      "required": false
      },
      {
       "name": "resource-id",
@@ -55085,7 +54842,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_move",
@@ -55475,10 +55233,6 @@
       "type": "string",
       "description": "文档 ID 或 URL (必填)"
      },
-     "output": {
-      "type": "string",
-      "description": "输出到本地文件路径（仅 --content-format jsonml 时生效）"
-     },
      "password": {
       "type": "string",
       "description": "互联网公开文档开启密码保护时的访问密码；普通文档无需传入"
@@ -55541,12 +55295,6 @@
       "key": "node",
       "type": "string",
       "required": true
-     },
-     {
-      "name": "output",
-      "key": "output",
-      "type": "string",
-      "required": false
      },
      {
       "name": "password",
@@ -55704,7 +55452,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_resource_update",
@@ -55712,10 +55461,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "工作目录内已存在封面图片的相对路径"
-     },
      "from_clipboard": {
       "type": "boolean",
       "description": "读取系统剪贴板PNG，与本地file及image互斥"
@@ -55745,12 +55490,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "from-clipboard",
       "key": "from_clipboard",
@@ -56759,7 +56498,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_shortcut_list",
@@ -56905,7 +56645,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_shortcut_media_insert",
@@ -56913,10 +56654,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "工作目录内已存在的相对文件路径"
-     },
      "file_view": {
       "type": "string",
       "enum": [
@@ -56970,12 +56707,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "file-view",
       "key": "file_view",
@@ -57092,7 +56823,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_shortcut_move",
@@ -57924,7 +57656,7 @@
      "node"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "doc",
@@ -58007,7 +57739,7 @@
      "node"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "doc",
@@ -58034,10 +57766,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "本地图片文件路径 (与 --image 互斥)"
-     },
      "image": {
       "type": "string",
       "description": "封面图片 URL (外链会自动转存为内部地址)"
@@ -58065,12 +57793,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "image",
       "key": "image",
@@ -58321,10 +58043,6 @@
       "type": "string",
       "description": "文档内容（短文本字面量）；传 - 表示从 stdin 读取"
      },
-     "content_file": {
-      "type": "string",
-      "description": "从文件读取文档内容（UTF-8）。推荐长/多行/表格内容使用"
-     },
      "content_format": {
       "type": "string",
       "description": "内容格式: 默认为 markdown，可选 jsonml"
@@ -58370,12 +58088,6 @@
      {
       "name": "content",
       "key": "content",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "content-file",
-      "key": "content_file",
       "type": "string",
       "required": false
      },
@@ -58498,7 +58210,8 @@
     ],
     "supportsYes": true
    },
-   "category": "doc"
+   "category": "doc",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "doc_version_list",
@@ -59814,7 +59527,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_download_version",
@@ -59919,7 +59633,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_export",
@@ -59983,7 +59698,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_export_get",
@@ -61305,7 +61021,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_push",
@@ -61370,7 +61087,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_quota",
@@ -62158,7 +61876,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_shortcut_info",
@@ -62948,7 +62667,7 @@
      "node"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "drive",
@@ -63093,7 +62812,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_star_add",
@@ -63233,7 +62953,7 @@
      "node"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "drive",
@@ -63350,7 +63070,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_sync",
@@ -63425,7 +63146,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_task_get",
@@ -63575,7 +63297,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_upload_info",
@@ -63706,7 +63429,8 @@
     ],
     "supportsYes": true
    },
-   "category": "drive"
+   "category": "drive",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "drive_version_get",
@@ -64639,7 +64363,8 @@
     ],
     "supportsYes": true
    },
-   "category": "mail"
+   "category": "mail",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "mail_attachment_list",
@@ -64820,7 +64545,7 @@
      "email"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "mail",
@@ -65474,7 +65199,7 @@
      "id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "mail",
@@ -65728,7 +65453,7 @@
      "ids"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "mail",
@@ -67114,7 +66839,7 @@
      "id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "mail",
@@ -68419,10 +68144,6 @@
       },
       "description": "多个听记 taskUuid，最多 50 个；约束：--id 与 --ids 只能选择一种，去重后 taskUuid 必须为 1..50 个"
      },
-     "output_dir": {
-      "type": "string",
-      "description": "file/both 模式下的安全相对输出目录；约束：file/both 输出目录必须是安全相对路径"
-     },
      "page_limit": {
       "type": "number",
       "description": "逐字稿自动翻页安全上限；约束：--page-limit 必须大于 0"
@@ -68478,12 +68199,6 @@
       "name": "ids",
       "key": "ids",
       "type": "stringArray",
-      "required": false
-     },
-     {
-      "name": "output-dir",
-      "key": "output_dir",
-      "type": "string",
       "required": false
      },
      {
@@ -68581,7 +68296,8 @@
     ],
     "supportsYes": true
    },
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_export_pack",
@@ -68666,7 +68382,8 @@
     ],
     "supportsYes": true
    },
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_get_audio",
@@ -68983,7 +68700,7 @@
      "words"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "minutes",
@@ -69587,7 +69304,7 @@
      "member_uids"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "minutes",
@@ -71959,7 +71676,8 @@
     ],
     "supportsYes": true
    },
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_upload_and_analyze",
@@ -72120,7 +71838,8 @@
     ],
     "supportsYes": true
    },
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_upload_and_notify",
@@ -72204,7 +71923,8 @@
     ],
     "supportsYes": true
    },
-   "category": "minutes"
+   "category": "minutes",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "minutes_upload_cancel",
@@ -72221,7 +71941,7 @@
      "session_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "minutes",
@@ -72701,7 +72421,8 @@
     ],
     "supportsYes": true
    },
-   "category": "oa"
+   "category": "oa",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "oa_approval_create_instance",
@@ -72981,7 +72702,8 @@
     ],
     "supportsYes": true
    },
-   "category": "oa"
+   "category": "oa",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "oa_approval_list_by_admin",
@@ -75308,10 +75030,6 @@
       "type": "string",
       "description": "日志内容 JSON 数组 (必填，或用 --contents-file)，每项含 key/sort/content/contentType/type；传 - 表示从 stdin 读取"
      },
-     "contents_file": {
-      "type": "string",
-      "description": "从文件读取 contents JSON（推荐用于含中文/换行/Markdown 的长内容，避免 shell 引号转义；优先级：--contents-file > --contents - (stdin) > --contents '<json>'）"
-     },
      "dd_from": {
       "type": "string",
       "description": "创建来源标识"
@@ -75346,12 +75064,6 @@
      {
       "name": "contents",
       "key": "contents",
-      "type": "string",
-      "required": false
-     },
-     {
-      "name": "contents-file",
-      "key": "contents_file",
       "type": "string",
       "required": false
      },
@@ -77390,10 +77102,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "本地图片文件路径，与 --src 二选一"
-     },
      "height": {
       "type": "number",
       "description": "图片高度，像素 (必填)"
@@ -77443,12 +77151,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "height",
       "key": "height",
@@ -78028,7 +77730,8 @@
     ],
     "supportsYes": true
    },
-   "category": "sheet"
+   "category": "sheet",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheet_export_csv",
@@ -78112,7 +77815,8 @@
     ],
     "supportsYes": true
    },
-   "category": "sheet"
+   "category": "sheet",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheet_filter_clear_criteria",
@@ -78139,7 +77843,7 @@
      "sheet_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "sheet",
@@ -79547,7 +79251,8 @@
     ],
     "supportsYes": true
    },
-   "category": "sheet"
+   "category": "sheet",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheet_import_get",
@@ -79909,7 +79614,8 @@
     ],
     "supportsYes": true
    },
-   "category": "sheet"
+   "category": "sheet",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "sheet_merge_cells",
@@ -82460,10 +82166,6 @@
    "inputSchema": {
     "type": "object",
     "properties": {
-     "file": {
-      "type": "string",
-      "description": "用于替换浮动图片的本地图片路径，与 --src 不能同时使用"
-     },
      "float_image_id": {
       "type": "string",
       "description": "浮动图片 ID (必填)"
@@ -82515,12 +82217,6 @@
     ],
     "argStyle": "flags",
     "flags": [
-     {
-      "name": "file",
-      "key": "file",
-      "type": "string",
-      "required": false
-     },
      {
       "name": "float-image-id",
       "key": "float_image_id",
@@ -82821,7 +82517,8 @@
     ],
     "supportsYes": true
    },
-   "category": "sheet"
+   "category": "sheet",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "todo_assign",
@@ -84036,7 +83733,8 @@
     ],
     "supportsYes": true
    },
-   "category": "todo"
+   "category": "todo",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "todo_task_add_executor",
@@ -84636,7 +84334,7 @@
      "task_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "todo",
@@ -84682,7 +84380,7 @@
      "task_id"
     ]
    },
-   "risk": "write",
+   "risk": "high-risk-write",
    "cli": {
     "path": [
      "todo",
@@ -84969,7 +84667,8 @@
     ],
     "supportsYes": true
    },
-   "category": "todo"
+   "category": "todo",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "whiteboard_create_with_content",
@@ -85213,7 +84912,8 @@
     ],
     "supportsYes": true
    },
-   "category": "whiteboard"
+   "category": "whiteboard",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "whiteboard_export_get",
@@ -85272,7 +84972,8 @@
     ],
     "supportsYes": true
    },
-   "category": "whiteboard"
+   "category": "whiteboard",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "whiteboard_query",
@@ -85396,7 +85097,8 @@
     ],
     "supportsYes": true
    },
-   "category": "whiteboard"
+   "category": "whiteboard",
+   "unavailable": "needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files"
   },
   {
    "name": "whiteboard_shortcut_query",

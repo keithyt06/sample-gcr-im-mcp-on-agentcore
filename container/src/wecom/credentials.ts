@@ -6,7 +6,7 @@
 // OUTSIDE the CLI 1.3 sandbox (cwd + system tmp) so tool calls can never read or overwrite it.
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { log } from '../metrics';
+import { hashUserId, log } from '../metrics';
 import type { SecretsApi } from '../secrets';
 
 export const CRED_FILE = 'credentials.enc';
@@ -99,7 +99,7 @@ export async function writeBackAndClean(store: WecomStore, userId: string, dir: 
     if (updated) await store.save(userId, updated);
   } catch (e) {
     // A refreshed token that is not stored forces the user to re-authorize: make it loud.
-    log('CRITICAL', 'credential_writeback_failed', { userId, error: String((e as Error).message ?? e) });
+    log('CRITICAL', 'credential_writeback_failed', { userHash: hashUserId(userId), error: String((e as Error).message ?? e) });
   }
   await rm(dir, { recursive: true, force: true }).catch(() => undefined);
 }

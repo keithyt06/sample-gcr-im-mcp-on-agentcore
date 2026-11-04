@@ -28,7 +28,9 @@ feishu:
 # dingtalk:
 #   clientId: dingxxxxxxxxxxxx         # DingTalk Client ID (AppKey)
 #   scopes: [openid, corpid]           # default
-# wecom: {}                            # no app credentials; users scan a QR code
+# wecom:                               # no app credentials; users scan a QR code
+#   maxPendingQr: 20                   # cap on concurrent pending QR logins (default 20)
+#   requireApproval: false             # true: new users wait for `npm run users -- approve <userId>` (WeCom has no tenant boundary)
 
 ingress:
   # Optional custom domain (required in practice in AWS China because of ICP filing).
@@ -37,7 +39,7 @@ ingress:
   # certificateArn: arn:<partition>:acm:<region>:<account-id>:certificate/<uuid>
   edge: none                           # none | cloudfront (cloudfront: AWS Global only, no customDomain in v1)
   waf: false                           # true needs edge: cloudfront (AWS Global only; creates ImMcp-<slug>-Waf in us-east-1)
-  rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10 }
+  rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10, authorizeRps: 2, authorizeBurst: 5 }
 
 runtime:
   idleTimeoutSec: 600                  # AgentCore session idle timeout (60-28800)

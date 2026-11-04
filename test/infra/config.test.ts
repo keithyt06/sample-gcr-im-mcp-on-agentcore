@@ -32,7 +32,7 @@ const ok = (raw: unknown): Config => {
 describe('defaults', () => {
   it('fills every default', () => {
     const c = ok(base());
-    expect(c.ingress).toEqual({ edge: 'none', waf: false, rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10 } });
+    expect(c.ingress).toEqual({ edge: 'none', waf: false, rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10, authorizeRps: 2, authorizeBurst: 5 } });
     expect(c.runtime).toEqual({ idleTimeoutSec: 600, maxConcurrent: 10 });
     expect(c.build).toEqual({ mirror: 'auto' });
     expect(c.oauth).toEqual({ extraRedirectHosts: [] });
@@ -92,6 +92,14 @@ describe('§2.3 rule 2: IM block', () => {
     ok({ ...base({ im: 'lark', lark: { appId: 'cli_b1b2c3d4e5f6a7b8' } }), feishu: undefined });
   });
   it('rejects any other IM block', () => expectIssue(base({ im: 'dingtalk', dingtalk: { clientId: 'dingabcdefgh1234' } }), /feishu: block present but im=dingtalk/));
+  it('wecom block: maxPendingQr / requireApproval defaults and validation (H-1, M-3)', () => {
+    const { feishu: _f, ...rest } = base({ im: 'wecom' });
+    expect(ok({ ...rest, wecom: {} }).imConfig.wecom).toEqual({ maxPendingQr: 20, requireApproval: false });
+    expect(ok({ ...rest, wecom: null }).imConfig.wecom).toEqual({ maxPendingQr: 20, requireApproval: false });
+    expect(ok({ ...rest, wecom: { maxPendingQr: 5, requireApproval: true } }).imConfig.wecom).toEqual({ maxPendingQr: 5, requireApproval: true });
+    expectIssue({ ...rest, wecom: { maxPendingQr: 0 } }, /wecom\.maxPendingQr/);
+    expectIssue({ ...rest, wecom: { requireApproval: 'yes' } }, /wecom\.requireApproval/);
+  });
   it('wecom needs no block, and accepts an empty one', () => {
     const { feishu: _f, ...rest } = base({ im: 'wecom' });
     ok(rest);
@@ -153,6 +161,9 @@ describe('§2.3 rule 9: rate limits', () => {
   it('registerBurst >= registerRps', () => expectIssue(base({ ingress: { rateLimit: { registerRps: 10, registerBurst: 5 } } }), /registerBurst must be >= registerRps/));
   it('registerRps <= rps', () => expectIssue(base({ ingress: { rateLimit: { rps: 5, burst: 100, registerRps: 6, registerBurst: 10 } } }), /registerRps must be <= rps/));
   it('range limits', () => expectIssue(base({ ingress: { rateLimit: { rps: 0 } } }), /ingress\.rateLimit\.rps/));
+  it('authorizeBurst >= authorizeRps (H-1)', () => expectIssue(base({ ingress: { rateLimit: { authorizeRps: 4, authorizeBurst: 3 } } }), /authorizeBurst must be >= authorizeRps/));
+  it('authorizeRps <= rps (H-1)', () =>
+    expectIssue(base({ ingress: { rateLimit: { rps: 3, burst: 100, registerRps: 1, authorizeRps: 4, authorizeBurst: 10 } } }), /authorizeRps must be <= rps/));
 });
 
 describe('§2.3 rule 10: cn mirror on a Global region needs build.baseImage', () => {

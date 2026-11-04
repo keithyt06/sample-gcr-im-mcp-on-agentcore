@@ -26,7 +26,9 @@
     "qr_waiting": "Waiting for scan (valid for 5 minutes)...",
     "qr_done": "Authorized. Returning to your client...",
     "qr_failed": "Authorization did not complete. Start again from your MCP client.",
-    "qr_timeout": "Timed out. Start again from your MCP client."
+    "qr_timeout": "Timed out. Start again from your MCP client.",
+    "err_too_many_pending": "Too many sign-ins are in progress right now. Wait a minute and try again.",
+    "qr_pending_approval": "Authorized. Your access is waiting for operator approval; reconnect the MCP server in your client after you are approved."
   },
   "zh": {
     "title_error": "授权失败",
@@ -55,6 +57,8 @@
     "qr_waiting": "等待扫码（5 分钟内有效）……",
     "qr_done": "授权成功，正在返回客户端……",
     "qr_failed": "授权未完成，请在 MCP 客户端中重新发起。",
-    "qr_timeout": "已超时，请在 MCP 客户端中重新发起。"
+    "qr_timeout": "已超时，请在 MCP 客户端中重新发起。",
+    "err_too_many_pending": "当前进行中的登录过多，请稍等一分钟后重试。",
+    "qr_pending_approval": "授权成功，正在等待管理员审批。审批通过后，请在客户端中重新连接 MCP 服务器。"
   }
 }

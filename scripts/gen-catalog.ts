@@ -2,6 +2,11 @@
 //
 //   npm run gen:catalog -- --cli lark|dingtalk|wecom [--check]
 //
+// Platform note (review L-5): introspection uses the HOST-platform build of the pinned CLI, while the
+// image ships linux-arm64. Help/schema output is embedded in the CLI source and is platform-independent
+// in practice; the Ops image check should diff `<bin> --version` (and one `--help`) inside the image
+// against catalog.cliVersion. Running this script inside an arm64 container works too (needs QEMU).
+//
 // Installs the pinned CLI (host platform build) into .cache/cli/<family>, introspects it, writes
 // catalog.json, and validates that every tier1.json name resolves and is runnable. For lark it also
 // writes config/scopes/feishu.json. Output is deterministic except `generatedAt`; --check compares
@@ -273,8 +278,9 @@ async function genDingtalk(bin: string): Promise<{ tools: CatalogTool[]; version
 
 const WECOM_SERVICES = ['calendar', 'chat', 'contact', 'disk', 'doc', 'mail', 'media', 'message', 'meeting', 'sheet', 'smartpage', 'smartsheet', 'todo', 'slide'];
 /** Methods that only work with a file inside the container (upload from / download to a local path). */
+const FILE_REASON_WECOM = 'needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files';
 const WECOM_UNAVAILABLE_RE = /^media\.(upload|download)$|\.(files|images)\.upload$|\.import$|^disk\.files\.download$|^message\.files\.get$|^smartpage\.pages\.(append|overwrite)$|^slide\.pages\.export$/;
-const WECOM_UNAVAILABLE_REASON = 'needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files';
+const WECOM_UNAVAILABLE_REASON = FILE_REASON_WECOM;
 
 function wecomRisk(method: string): Risk {
   const verb = method.split('.').at(-1)!;
@@ -337,6 +343,53 @@ async function genWecom(bin: string): Promise<{ tools: CatalogTool[]; version: s
   return { tools, version };
 }
 
+// ---------------------------------------------------------------- policy (all families)
+
+/** Flags that make the CLI spawn local processes / daemons or run unattended (review H-2). */
+export const PROCESS_FLAGS = new Set(['agent-cmd', 'agent-workdir', 'daemon', 'alwayson', 'yolo']);
+/** Commands that start a local agent bridge, a login flow, or a long-running listener (review H-2). */
+const PROCESS_TOOL_RE = /^dingtalk_tag_connect(_|$)|^dingtalk_tag_manage_login$|^mail_watch$|^event_/;
+const PROCESS_REASON = 'starts a local process, daemon or long-running listener; never exposed by this server';
+
+/** Flags that read or write a file inside the server (review M-6; same rule as wecom file-path methods). */
+export const FILE_FLAGS = new Set([
+  'file', 'file-path', 'dir', 'source-path', 'project-path', 'icon-file', 'output', 'output-dir', 'output-path',
+  'local-dir', 'local-folder', 'body-file', 'patch-file', 'template-content-file', 'set-template-content-file', 'records-file', 'groups-file',
+  'config-file', 'content-file', 'contents-file', 'media-files', 'qr-file', 'form-cover-file', 'additional-files', 'export-output',
+]);
+const FILE_REASON = 'needs a local file inside the server (file upload/download); remote MCP clients cannot provide or receive files';
+
+/** Names that are destructive regardless of the vendor's declared risk (review M-5). */
+const DESTRUCTIVE_NAME_RE = /(^|_)(delete|remove|recall|transfer_owner|revoke|clear|disband|kick|quit|rollback|cancel)(_|$)/;
+
+/**
+ * Applied to every family after generation:
+ * - risk = max(vendor risk, name heuristic)
+ * - tools with process/daemon flags or names → unavailable
+ * - tools with a REQUIRED local-file flag → unavailable; optional local-file flags are removed from the schema
+ */
+export function applyPolicy(t: CatalogTool): CatalogTool {
+  const out: CatalogTool = { ...t };
+  if (DESTRUCTIVE_NAME_RE.test(t.name)) out.risk = 'high-risk-write';
+  const flags = t.cli.flags ?? [];
+  if (PROCESS_TOOL_RE.test(t.name) || flags.some((f) => PROCESS_FLAGS.has(f.name))) {
+    out.unavailable = PROCESS_REASON;
+    return out;
+  }
+  const fileFlags = flags.filter((f) => FILE_FLAGS.has(f.name));
+  if (fileFlags.length === 0) return out;
+  if (fileFlags.some((f) => f.required) || /(^|_)(upload|download|import_file|push|pull|sync|export)(_|$)/.test(t.name)) {
+    out.unavailable ??= FILE_REASON;
+    return out;
+  }
+  const drop = new Set(fileFlags.map((f) => f.key));
+  const props = { ...((t.inputSchema.properties as Record<string, unknown>) ?? {}) };
+  for (const k of drop) delete props[k];
+  out.inputSchema = { ...t.inputSchema, properties: props };
+  out.cli = { ...t.cli, flags: flags.filter((f) => !drop.has(f.key)) };
+  return out;
+}
+
 // ---------------------------------------------------------------- main
 
 function stable(v: unknown): string {
@@ -350,7 +403,9 @@ async function main(): Promise<void> {
   if (i < 0 || !['lark', 'dingtalk', 'wecom'].includes(fam)) throw new Error('usage: gen-catalog --cli lark|dingtalk|wecom [--check]');
   const bin = installCli(fam);
   const gen = fam === 'lark' ? genLark : fam === 'dingtalk' ? genDingtalk : genWecom;
-  const { tools, version } = await gen(bin);
+  const gen0 = await gen(bin);
+  const version = gen0.version;
+  const tools = gen0.tools.map(applyPolicy);
   if (version !== CLI[fam].version) throw new Error(`installed ${fam} CLI reports ${version}, expected ${CLI[fam].version}`);
   tools.sort((a, b) => a.name.localeCompare(b.name));
   const dup = tools.find((t, k) => k > 0 && tools[k - 1]!.name === t.name);

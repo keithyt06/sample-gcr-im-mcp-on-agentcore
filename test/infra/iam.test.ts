@@ -1,6 +1,6 @@
 // IAM least-privilege contract (technical design §3.5, §6.2).
 import { describe, expect, it } from 'vitest';
-import { arr, resourcesOf, statements, synthFixture, type Synth } from './helpers.js';
+import { arr, resourcesOf, statements, synthFixture, type PolicyStatement, type Synth } from './helpers.js';
 
 /** Actions per role, keyed by a role label, for one synthesized stack. */
 function actionsByRole(s: Synth): Record<string, Set<string>> {
@@ -125,9 +125,23 @@ describe('IAM: wecom (qr)', () => {
   it('Resource "*" only for ecr:GetAuthorizationToken (no refresh Lambda)', () => {
     expect(starStatements(s)).toEqual(['ecr:GetAuthorizationToken']);
   });
-  it('runtime role writes user secrets with the CMK', () => {
-    for (const x of ['secretsmanager:CreateSecret', 'secretsmanager:PutSecretValue', 'secretsmanager:GetSecretValue', 'kms:Encrypt', 'kms:GenerateDataKey'])
+  it('runtime role writes user secrets with the CMK (M-8: narrowed, no DescribeSecret)', () => {
+    for (const x of ['secretsmanager:CreateSecret', 'secretsmanager:PutSecretValue', 'secretsmanager:GetSecretValue', 'secretsmanager:TagResource', 'kms:Encrypt', 'kms:GenerateDataKey'])
       expect(a.runtime.has(x), x).toBe(true);
+    expect(a.runtime.has('secretsmanager:DescribeSecret')).toBe(false);
+    expect(a.runtime.has('secretsmanager:DeleteSecret')).toBe(false);
+  });
+  it('runtime CreateSecret requires the stack CMK; TagResource allows only the WecomUserId tag key', () => {
+    const sts = statements(s.json).map((x) => x.st as PolicyStatement & { Condition?: any });
+    const create = sts.filter((st) => arr(st.Action).includes('secretsmanager:CreateSecret') && JSON.stringify(st.Resource).includes('t-wecom-cn/users/*'));
+    const runtimeCreate = create.filter((st) => st.Condition);
+    expect(runtimeCreate).toHaveLength(1);
+    expect(arr(runtimeCreate[0].Action)).toEqual(['secretsmanager:CreateSecret']);
+    expect(runtimeCreate[0].Condition.StringEquals['secretsmanager:KmsKeyArn']).toBeDefined();
+    const tag = sts.find((st) => arr(st.Action).includes('secretsmanager:TagResource'))!;
+    expect(arr(tag.Action)).toEqual(['secretsmanager:TagResource']);
+    expect(tag.Condition['ForAllValues:StringEquals']['aws:TagKeys']).toEqual(['WecomUserId']);
+    expect(tag.Condition.Null['aws:TagKeys']).toBe('false');
   });
   it('oauth role per §6.2 (wecom)', () => {
     expect([...a.oauth].sort()).toEqual(

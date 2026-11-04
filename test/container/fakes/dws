@@ -22,6 +22,13 @@ switch (s) {
   case 'admin':
     finish(undefined, 1, JSON.stringify({ error: { category: 'auth', reason: 'cli_not_enabled', message: 'cli_not_enabled for org' } }));
     break;
+  case 'sigkill':
+    process.stderr.write('partial output for ' + token + '\n');
+    process.kill(process.pid, 'SIGKILL');
+    break;
+  case 'echo_token':
+    finish(undefined, 1, 'request failed: Authorization: Bearer ' + token + ' --token ' + token);
+    break;
   case 'token_rejected':
     finish(undefined, 1, JSON.stringify({ error: { category: 'api', code: 1, reason: 'business_error', server_error_code: 'TOKEN_VERIFIED_FAILED', message: 'business error: success=false' } }));
     break;

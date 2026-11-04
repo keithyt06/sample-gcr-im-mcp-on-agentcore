@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { baseEnv, runCli, tmpRoot } from '../cli-runner';
-import { log } from '../metrics';
+import { hashUserId, log } from '../metrics';
 import { readBlob, newConfigDir, type WecomIdentity, type WecomStore } from './credentials';
 import { ANSI_RE, extractCliError, stripIdentityContext } from './identity';
 
@@ -166,17 +166,17 @@ export class WecomAuthFlow {
         s.identity = await this.readIdentity(s.cfgDir);
         await this.o.store.save(s.userId, blob, s.identity);
         s.state = 'authorized';
-        log('INFO', 'wecom_auth_completed', { userId: s.userId, sessionId, botId: s.identity?.botId ?? null });
+        log('INFO', 'wecom_auth_completed', { userHash: hashUserId(s.userId), sessionId, botId: s.identity?.botId ?? null });
       } else {
         const e = extractCliError(s.out);
         s.reason ??= e ? `${e.type}(${e.code}): ${e.message}` : tail(s.out);
         s.state = e?.code === QR_TIMEOUT_CODE ? 'expired' : 'failed';
-        log('INFO', `wecom_auth_${s.state}`, { userId: s.userId, sessionId, code: e?.code ?? null });
+        log('INFO', `wecom_auth_${s.state}`, { userHash: hashUserId(s.userId), sessionId, code: e?.code ?? null });
       }
     } catch (err) {
       s.state = 'failed';
       s.reason = `writeback_failed: ${String((err as Error).message ?? err)}`;
-      log('CRITICAL', 'wecom_auth_writeback_failed', { userId: s.userId, sessionId, error: s.reason });
+      log('CRITICAL', 'wecom_auth_writeback_failed', { userHash: hashUserId(s.userId), sessionId, error: s.reason });
     }
   }
 
