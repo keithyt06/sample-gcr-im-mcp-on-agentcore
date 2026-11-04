@@ -10,7 +10,7 @@ No AWS resources were created or modified. Account IDs are masked as `<ACCT_GLOB
 
 | | Global A | Global B | China A | China B |
 |-|-|-|-|-|
-| CLI profile | `default` | `default` | `gcr` | `gcr` |
+| CLI profile | `default` | `default` | `<china-profile>` | `<china-profile>` |
 | Account | `<ACCT_GLOBAL>` | `<ACCT_GLOBAL>` | `<ACCT_CN>` | `<ACCT_CN>` |
 | Region | ap-northeast-1 | us-west-2 | cn-north-1 | cn-northwest-1 |
 | Partition / suffix | aws / amazonaws.com | aws / amazonaws.com | aws-cn / amazonaws.com.cn | aws-cn / amazonaws.com.cn |
@@ -30,7 +30,7 @@ cn-northwest-1** (Ningxia; the Lark reference sample was verified there on 2026-
 cn-north-1 as the second China check. Runtime names must stay unique per account+region; our
 prefix (`im_mcp_<slug>`) does not collide with anything that exists today.
 
-### China service API smoke (profile `gcr`, both regions)
+### China service API smoke (profile `<china-profile>`, both regions)
 
 All of these returned successfully (no AccessDenied, no "unknown endpoint"): ECR
 `describe-repositories`, Secrets Manager `list-secrets`, KMS `list-keys`, DynamoDB `list-tables`,
@@ -91,8 +91,8 @@ equals the upstream arm64 manifest digest (`sha256:9a422d62…c4ecbc`, 79.9 MB c
   before the first WAF test.
 - China cn-north-1 / cn-northwest-1: **bootstrap required** (operator action, needs approval):
   ```bash
-  AWS_PROFILE=gcr npx cdk bootstrap aws://<ACCT_CN>/cn-northwest-1
-  AWS_PROFILE=gcr npx cdk bootstrap aws://<ACCT_CN>/cn-north-1
+  AWS_PROFILE=<china-profile> npx cdk bootstrap aws://<ACCT_CN>/cn-northwest-1
+  AWS_PROFILE=<china-profile> npx cdk bootstrap aws://<ACCT_CN>/cn-north-1
   ```
   China does not need a us-east-1 bootstrap.
 
@@ -100,15 +100,15 @@ equals the upstream arm64 manifest digest (`sha256:9a422d62…c4ecbc`, 79.9 MB c
 
 ```bash
 REGION=cn-northwest-1                     # or cn-north-1
-ACCT=$(aws sts get-caller-identity --profile gcr --region $REGION --query Account --output text)
+ACCT=$(aws sts get-caller-identity --profile <china-profile> --region $REGION --query Account --output text)
 REG=$ACCT.dkr.ecr.$REGION.amazonaws.com.cn
 SRC=public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
 DST=$REG/gcr-im-mcp/base/node:22-bookworm-slim
 
-aws ecr create-repository --profile gcr --region $REGION \
+aws ecr create-repository --profile <china-profile> --region $REGION \
   --repository-name gcr-im-mcp/base/node \
   --image-tag-mutability IMMUTABLE --image-scanning-configuration scanOnPush=true
-aws ecr get-login-password --profile gcr --region $REGION | docker login -u AWS --password-stdin $REG
+aws ecr get-login-password --profile <china-profile> --region $REGION | docker login -u AWS --password-stdin $REG
 
 docker pull --platform linux/arm64 "$SRC"
 docker tag "$SRC" "$DST"
@@ -135,7 +135,7 @@ must let the role pull:
 ```
 
 ```bash
-aws ecr set-repository-policy --profile gcr --region $REGION \
+aws ecr set-repository-policy --profile <china-profile> --region $REGION \
   --repository-name gcr-im-mcp/base/node --policy-text file://base-repo-policy.json
 ```
 
@@ -157,7 +157,7 @@ Preconditions: section 9 checklist is green for the target.
 5. `AWS_PROFILE=<p> AWS_REGION=<r> npx cdk deploy ImMcp-<slug> -c config=...`
    (and `ImMcp-<slug>-Waf` in us-east-1 if enabled, Global only). Always set `AWS_REGION` with
    China creds, because otherwise STS goes to the global endpoint and fails with `InvalidClientTokenId`.
-6. Post-deploy: `scripts/set-im-secret.sh` fills the IM app secret placeholder (skipped in our
+6. Post-deploy: `npm run secret:set-im-app -- [-c config=<path>] [--no-validate]` fills the IM app secret placeholder (skipped in our
    tests because we have no real IM app).
 7. Infra E2E smoke (base URL from stack output):
    - `GET /.well-known/oauth-authorization-server` → 200
@@ -246,7 +246,7 @@ Global (ap-northeast-1, profile `default`):
 - [ ] Explicit approval to run `cdk deploy` (brief: no deploys unless the task says so)
 - [ ] us-east-1 bootstrap checked (only if testing WAF)
 
-China (cn-northwest-1 then cn-north-1, profile `gcr`):
+China (cn-northwest-1 then cn-north-1, profile `<china-profile>`):
 - [x] AgentCore Runtime API available; CFN resource type public; MCP protocol + header allowlist in schema
 - [x] ECR / Secrets Manager / KMS / DynamoDB / API GW v2 / Scheduler / Lambda / SSM APIs callable
 - [x] China ECR login works; npmmirror reachable

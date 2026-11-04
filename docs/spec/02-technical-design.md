@@ -155,7 +155,7 @@ to Docker bundling). The container is bundled by `infra/lib/constructs/image.ts`
 | `gen:catalog` | `tsx scripts/gen-catalog.ts` |
 
 Config path: `-c config=<path>` (default `config/deploy.yaml`). Example:
-`AWS_PROFILE=gcr AWS_REGION=cn-northwest-1 npm run deploy -- -c config=config/cn.local.yaml`.
+`AWS_PROFILE=<china-profile> AWS_REGION=cn-northwest-1 npm run deploy -- -c config=config/e2e-cn.local.yaml`.
 
 Dependencies (exact pins at scaffold, lockfile committed): `aws-cdk-lib@2.275.0`, `constructs@10.x`,
 `aws-cdk@2.1147.0` (dev), `zod@4.x`, `yaml`, `@aws-sdk/client-{secrets-manager,dynamodb,ssm,cloudformation}`,
@@ -978,7 +978,7 @@ repo owner** in `docs/en/testing.md`. It is not automated.
 Checked 2026-11-04: `AWS::BedrockAgentCore::Runtime` is available in **ap-northeast-1** and
 us-west-2 (AWS regional-availability API). For cn-north-1 and cn-northwest-1, Ops confirmed the CFN
 type with `describe-type`. Global = **ap-northeast-1** (profile `default`). China = **cn-northwest-1**
-first, then cn-north-1 (profile `gcr`). China needs Ops §2 bootstrap and §3 base-image mirror first
+first, then cn-north-1 (profile `<china-profile>`). China needs Ops §2 bootstrap and §3 base-image mirror first
 (operator approval).
 
 Order (sequential; slug `e2e-<im>`; destroy and run the teardown checklist after each):
