@@ -1,0 +1,5 @@
+# Test fixture (wecom, partition cn). No secrets, no account IDs.
+region: cn-northwest-1
+im: wecom
+slug: t-wecom-cn
+wecom: {}

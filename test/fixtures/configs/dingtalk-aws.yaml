@@ -1,0 +1,5 @@
+# Test fixture (dingtalk, partition aws). No secrets, no account IDs.
+region: ap-northeast-1
+im: dingtalk
+slug: t-dingtalk-aws
+dingtalk: { clientId: dingabcdefgh12345678 }

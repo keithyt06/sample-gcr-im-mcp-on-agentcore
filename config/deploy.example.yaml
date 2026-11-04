@@ -1,0 +1,54 @@
+# Deployment config for sample-gcr-im-mcp-on-agentcore.
+# Copy to config/deploy.yaml (gitignored) and edit. Deploy with:
+#   AWS_PROFILE=<profile> AWS_REGION=<region> npm run deploy -- -c config=config/deploy.yaml
+#
+# This file holds identifiers and names ONLY. Never put secrets, tokens, passwords or account IDs here:
+# the IM app secret goes to Secrets Manager with `npm run secret:set-im-app`.
+# Keys whose name looks like a secret (secret/token/password/apikey) are rejected.
+
+# AWS region with AgentCore Runtime. The partition (aws / aws-cn) is derived from it:
+# cn-north-1 / cn-northwest-1 deploy to AWS China, every other supported region to AWS Global.
+region: ap-northeast-1
+
+# Exactly one IM per deployment: feishu | lark | dingtalk | wecom
+im: feishu
+
+# Short deployment name (3-20 chars, lowercase, digits, "-"); unique per account + region.
+# Used in the stack name (ImMcp-<slug>) and secret names (<slug>/im-app, <slug>/root-key, <slug>/users/<id>).
+slug: team-a
+
+# Per-IM block. Docs call these keys im.<im>.*; in YAML they are a top-level block named after the IM.
+# Keep only the block that matches `im` (any other IM block is rejected).
+feishu:
+  appId: cli_xxxxxxxxxxxxxxxx          # Feishu developer console -> Credentials & Basic Info
+  # scopes: [offline_access, ...]      # default: config/scopes/feishu.json scopes.user
+# lark:
+#   appId: cli_xxxxxxxxxxxxxxxx
+#   scopes: [offline_access, ...]
+# dingtalk:
+#   clientId: dingxxxxxxxxxxxx         # DingTalk Client ID (AppKey)
+#   scopes: [openid, corpid]           # default
+# wecom: {}                            # no app credentials; users scan a QR code
+
+ingress:
+  # Optional custom domain (required in practice in AWS China because of ICP filing).
+  # Set both keys; the ACM certificate must be in the same partition and region as the stack.
+  # customDomain: mcp.example.com
+  # certificateArn: arn:<partition>:acm:<region>:<account-id>:certificate/<uuid>
+  edge: none                           # none | cloudfront (cloudfront: AWS Global only, no customDomain in v1)
+  waf: false                           # true needs edge: cloudfront (AWS Global only; creates ImMcp-<slug>-Waf in us-east-1)
+  rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10 }
+
+runtime:
+  idleTimeoutSec: 600                  # AgentCore session idle timeout (60-28800)
+  maxConcurrent: 10                    # concurrent CLI calls per microVM (1-50)
+
+build:
+  mirror: auto                         # auto | cn | global. auto: cn for China regions (npmmirror + China ECR base image)
+  # baseImage: <registry>/<repo>@sha256:<digest>   # required for mirror: cn on a Global region
+
+oauth:
+  extraRedirectHosts: []               # extra HTTPS redirect hosts for MCP clients, e.g. [mcp.example.com, '*.corp.example.com']
+
+alarm: {}
+  # webhookUrlSsmParam: /team-a/alarm-webhook   # NAME of an SSM parameter you create that holds an IM bot webhook URL

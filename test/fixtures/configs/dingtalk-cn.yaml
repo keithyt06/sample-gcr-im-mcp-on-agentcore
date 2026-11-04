@@ -1,0 +1,5 @@
+# Test fixture (dingtalk, partition cn). No secrets, no account IDs.
+region: cn-northwest-1
+im: dingtalk
+slug: t-dingtalk-cn
+dingtalk: { clientId: dingabcdefgh12345678 }

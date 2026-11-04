@@ -1,0 +1,5 @@
+# Test fixture (wecom, partition aws). No secrets, no account IDs.
+region: ap-northeast-1
+im: wecom
+slug: t-wecom-aws
+wecom: {}

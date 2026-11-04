@@ -33,6 +33,8 @@ Everything in this table must be ready **before** the first `deploy`. Secrets ne
 | 23 | Alarm webhook URL (optional) | all | A bot webhook in your IM (or any HTTPS endpoint) | Store the URL in an **SSM parameter** you create. Config key `alarm.webhookUrlSsmParam` holds only the **parameter name** |
 | 24 | MCP client | all | Global: Amazon Quick, Kiro, Claude Code, Codex, Cursor. China: Kiro, Claude Code, Codex, Cursor (Amazon Quick is not available in AWS China) | End users only need `<base>/mcp` |
 
+> **Note on `im.<im>.*` keys:** in `config/deploy.yaml` these are written as a top-level `feishu:` (or `lark:`, `dingtalk:`, `wecom:`) block, next to `im: feishu`. For example, `im.feishu.appId` is `feishu: { appId: cli_xxx }`. Keep only the block that matches `im`. See `config/deploy.example.yaml`.
+
 ## Order of operations
 
 1. Items 1–11 (AWS side), item 12–13 if China.

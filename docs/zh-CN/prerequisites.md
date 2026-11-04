@@ -33,6 +33,8 @@
 | 23 | 告警 webhook URL（可选） | all | IM 群机器人 webhook（或任意 HTTPS 端点） | 先自行把 URL 存入一个 **SSM 参数**，配置项 `alarm.webhookUrlSsmParam` 只填**参数名** |
 | 24 | MCP 客户端 | all | Global：Amazon Quick、Kiro、Claude Code、Codex、Cursor。中国区：Kiro、Claude Code、Codex、Cursor（AWS 中国区没有 Amazon Quick） | 终端用户只需要 `<base>/mcp` |
 
+> **关于 `im.<im>.*` 配置项：** 在 `config/deploy.yaml` 里，这些配置项写成与 `im: feishu` 并列的顶层 `feishu:`（或 `lark:`、`dingtalk:`、`wecom:`）块。例如 `im.feishu.appId` 写作 `feishu: { appId: cli_xxx }`。只保留与 `im` 对应的那一个块。示例见 `config/deploy.example.yaml`。
+
 ## 操作顺序
 
 1. 准备第 1–11 项（AWS 侧）；中国区还要准备第 12–13 项。

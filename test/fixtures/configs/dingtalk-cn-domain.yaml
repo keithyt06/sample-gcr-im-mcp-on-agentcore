@@ -1,0 +1,9 @@
+# Test fixture: aws-cn with a custom domain (ICP) and alarm webhook. Certificate ARN uses a fixture account.
+region: cn-northwest-1
+im: dingtalk
+slug: t-ding-domain
+dingtalk: { clientId: dingabcdefgh12345678 }
+ingress:
+  customDomain: mcp.example.cn
+  certificateArn: arn:aws-cn:acm:cn-northwest-1:111111111111:certificate/12345678-1234-1234-1234-123456789012
+alarm: { webhookUrlSsmParam: /t-ding-domain/alarm-webhook }
