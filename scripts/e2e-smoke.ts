@@ -9,7 +9,7 @@ import type { Im } from '../shared/contract.js';
 import { die, isMain, parseArgs, resolveTarget, stackOutputs } from './common.js';
 import { E2E_USER_ID, mintTestToken } from './mint-test-token.js';
 
-const IM_HOSTS: Record<Exclude<Im, 'wecom'>, string> = {
+export const IM_HOSTS: Record<Exclude<Im, 'wecom'>, string> = {
   feishu: 'accounts.feishu.cn',
   lark: 'accounts.larksuite.com',
   dingtalk: 'login.dingtalk.com',
@@ -149,8 +149,11 @@ async function main(): Promise<void> {
     }
     expect(r.status === 200, `status ${r.status}`);
     const html = await r.text();
-    expect(html.includes('work.weixin.qq.com'), 'QR page does not contain work.weixin.qq.com');
+    // The page embeds the container-rendered QR PNG, or falls back to the work.weixin.qq.com link.
+    const hasQr = /<img id="qr"[^>]*src="data:image\/png;base64,[A-Za-z0-9+/=]{100,}"/.test(html);
+    expect(hasQr || html.includes('work.weixin.qq.com'), 'QR page has neither a QR image nor a work.weixin.qq.com link');
     imName = 'wecom';
+    return hasQr ? 'QR image' : 'QR link';
   });
 
   await step('6 minted token -> initialize + tools/list', async () => {
@@ -185,18 +188,23 @@ async function main(): Promise<void> {
     return firstTool;
   });
 
+  // API Gateway throttling is a best-effort, per-node token bucket: one burst can occasionally pass
+  // untouched, so allow up to 3 bursts before failing.
   await step('8 throttle: 40 parallel POST /register -> at least one 429', async () => {
-    const codes = await Promise.all(
-      Array.from({ length: 40 }, () =>
-        fetch(`${base}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect_uris: [redirectUri] }) }).then(
-          (r) => r.status,
-          () => 0,
+    let codes: number[] = [];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      codes = await Promise.all(
+        Array.from({ length: 40 }, () =>
+          fetch(`${base}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect_uris: [redirectUri] }) }).then(
+            (r) => r.status,
+            () => 0,
+          ),
         ),
-      ),
-    );
-    const n429 = codes.filter((c) => c === 429).length;
-    expect(n429 > 0, `no 429 (statuses: ${[...new Set(codes)].join(',')})`);
-    return `${n429}/40 throttled`;
+      );
+      const n429 = codes.filter((c) => c === 429).length;
+      if (n429 > 0) return `${n429}/40 throttled (burst ${attempt})`;
+    }
+    throw new Error(`no 429 in 3 bursts (statuses: ${[...new Set(codes)].join(',')})`);
   });
 
   const failed = results.filter((r) => !r.ok).length;

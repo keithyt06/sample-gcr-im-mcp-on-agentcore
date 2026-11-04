@@ -260,3 +260,21 @@ Verdict today: **Global = GO** once code and synth tests are ready and deploy is
 **China = CONDITIONAL GO**: needs bootstrap and base-image mirror (both approved resource
 creations) first, and has two first-deploy unknowns (nodejs22.x/arm64, ICP effect on the
 execute-api URL).
+
+## 10. Real deploy test results (2026-11-04, commit a79f564 + e2e-smoke fixes)
+
+| im | partition / region | stack | deploy time | image (compressed) | e2e |
+|-|-|-|-|-|-|
+| feishu | aws / ap-northeast-1 | ImMcp-e2eaws | 2m22s | ~95 MB | 8/8 |
+| dingtalk | aws / ap-northeast-1 | ImMcp-e2eaws-dt | 2m20s | ~152 MB | 8/8 |
+| wecom | aws / ap-northeast-1 | ImMcp-e2eaws-wc | 1m49s | ~155 MB | 8/8 |
+| feishu | aws-cn / cn-northwest-1 | ImMcp-e2ecn | 5m14s | ~95 MB | public URL: 0/8 (403, no ICP); internal via Lambda invoke: 7/7 |
+
+China notes: the build used the mirrored base image and npmmirror, with no fetches from GitHub or
+public.ecr.aws during the build. Lambda nodejs22.x/arm64 works in cn-northwest-1. On the default
+execute-api URL, every *defined* route returns `403 {"message":"Forbidden"}` within 0 ms latency.
+The access log shows the route key and `status 403`, with no integration error, and the Lambdas are
+never invoked. Undefined routes return 404. Routes, `AuthorizationType: NONE`, the Lambda resource
+policies (`arn:aws-cn:execute-api:…`), and stage deployment are all correct, so this is the
+account-level block on unfiled (no ICP) public API Gateway access. Use an ICP-filed custom domain
+for real users.
