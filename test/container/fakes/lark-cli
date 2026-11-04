@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+'use strict';
+const { ctl, record, finish, sleep, home } = require('./_common.cjs');
+const e = record('lark-cli');
+const c = ctl();
+const s = c.scenario || 'ok';
+(async () => {
+  if (e.argv[0] === '--version') return finish('lark-cli version 1.0.99\n');
+  switch (s) {
+    case 'ok':
+      return finish('{"ok":true,"data":{"echo":' + JSON.stringify(e.argv) + ',"big":7304827392019283746},"_notice":{"update":"run: lark-cli update"}}');
+    case 'missing_scope':
+      return finish({ ok: false, error: { type: 'authorization', subtype: 'missing_scope', code: 99991679, message: 'scope missing', missing_scopes: ['im:message.send_as_user'] } }, 1);
+    case 'missing_scope_noinfo':
+      return finish({ ok: false, error: { code: 99991672, message: 'app has not applied for scope' } }, 1);
+    case 'auth':
+      return finish('Refreshing\n' + JSON.stringify({ ok: false, error: { code: 99991668, message: 'token is expired' } }), 1);
+    case 'validation':
+      return finish({ ok: false, error: { type: 'validation', message: '--chat-id: required' } }, 2);
+    case 'crash':
+      return finish(undefined, 3, 'segfault-ish plain text');
+    case 'slow':
+      await sleep(Number(c.sleepMs || 3000));
+      return finish('{"ok":true}');
+    case 'big':
+      return finish('x'.repeat(5 * 1024 * 1024));
+    default:
+      return finish('{"ok":true}');
+  }
+})();

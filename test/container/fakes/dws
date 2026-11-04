@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+'use strict';
+const { ctl, record, finish } = require('./_common.cjs');
+const e = record('dws');
+const c = ctl();
+const s = c.scenario || 'ok';
+if (e.argv[0] === '--version') { finish('dws version v1.0.67\n'); return; }
+const token = e.argv[0] === '--token' ? e.argv[1] : null;
+switch (s) {
+  case 'ok':
+    finish({ success: true, token, argv: e.argv });
+    break;
+  case 'pat':
+    finish(undefined, 4, JSON.stringify({ success: false, code: 'PAT_SCOPE_AUTH_REQUIRED', data: { missingScope: 'Contact.User.Read', message: 'need scope' } }));
+    break;
+  case 'permission':
+    finish(undefined, 1, JSON.stringify({ error: { category: 'permission', reason: 'missing_scope', message: 'no perm', missing_scopes: ['a.b', 'c.d'] } }));
+    break;
+  case 'auth':
+    finish(undefined, 2, JSON.stringify({ error: { category: 'auth', reason: 'not_authenticated', message: 'token invalid' } }));
+    break;
+  case 'admin':
+    finish(undefined, 1, JSON.stringify({ error: { category: 'auth', reason: 'cli_not_enabled', message: 'cli_not_enabled for org' } }));
+    break;
+  case 'token_rejected':
+    finish(undefined, 1, JSON.stringify({ error: { category: 'api', code: 1, reason: 'business_error', server_error_code: 'TOKEN_VERIFIED_FAILED', message: 'business error: success=false' } }));
+    break;
+  case 'api':
+    finish(undefined, 1, JSON.stringify({ error: { category: 'api', code: 'E123', message: 'boom' } }));
+    break;
+  default:
+    finish({ success: true });
+}

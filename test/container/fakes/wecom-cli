@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const { ctl, record, finish, sleep, home } = require('./_common.cjs');
+const e = record('wecom-cli');
+const c = ctl();
+const s = c.scenario || 'ok';
+const cfg = process.env.WECOM_CLI_CONFIG_DIR || '';
+const IDENT = '\u5f53\u524d\u673a\u5668\u4eba\uff1a\n\u540d\u5b57\uff1a TestBot\nID\uff1a bot_1\n\u6388\u6743\u771f\u4eba\u7528\u6237\u8eab\u4efd\uff1a\n\u540d\u5b57\uff1a Alice\nID\uff1a wo_alice';
+const err = (code, message) => ({ error: { type: 'ApiError', code, message } });
+
+(async () => {
+  if (e.argv[0] === '--version') return finish('wecom-cli 1.3.4\n');
+  if (e.argv[0] === 'auth' && e.argv[1] === 'init') {
+    const mode = c.auth || 'success';
+    process.stderr.write('\x1b[32mINFO\x1b[0m starting\n');
+    const qi = e.argv.indexOf('--output-qrcode');
+    if (qi >= 0) fs.writeFileSync(path.join(process.cwd(), e.argv[qi + 1]), Buffer.alloc(200, 7));
+    process.stdout.write('Scan: https://work.weixin.qq.com/ai/qc/gen?source=wecom_cli_external&scode=abc123\n');
+    await sleep(Number(c.authDelayMs || 300));
+    if (mode === 'success') {
+      fs.writeFileSync(path.join(cfg, 'credentials.enc'), 'CRED-' + e.pid);
+      fs.writeFileSync(path.join(cfg, '.encryption_key'), 'KEY-' + e.pid);
+      return finish(undefined, 0);
+    }
+    if (mode === 'timeout') return finish(undefined, 1, JSON.stringify({ error: { type: 'QrTimeout', code: 893202, message: 'qr timeout' } }));
+    return finish(undefined, 1, JSON.stringify({ error: { type: 'AuthError', code: 893210, message: 'denied' } }));
+  }
+  if (e.argv.join('.').startsWith('contact.users.search')) {
+    return finish({ errcode: 0, users: [], extra_identity_context: IDENT });
+  }
+  const credPath = path.join(cfg, 'credentials.enc');
+  const cred = fs.existsSync(credPath) ? fs.readFileSync(credPath, 'utf8') : null;
+  switch (s) {
+    case 'ok':
+      return finish({ errcode: 0, cred, argv: e.argv, extra_identity_context: IDENT });
+    case 'refresh':
+      await sleep(30);
+      fs.writeFileSync(credPath, 'REFRESHED-' + e.pid);
+      return finish({ errcode: 0, refreshed: true });
+    case 'slow':
+      await sleep(Number(c.sleepMs || 300));
+      return finish({ errcode: 0, cred });
+    case '850003':
+      return finish(err(850003, 'capability authorization expired'), 1);
+    case '850005': {
+      const f = path.join(home, 'fake-counter');
+      const n = f && fs.existsSync(f) ? Number(fs.readFileSync(f, 'utf8')) : 0;
+      if (f) fs.writeFileSync(f, String(n + 1));
+      if (n < Number(c.fails ?? 99)) return finish(err(850005, 'rate limited'), 1);
+      return finish({ errcode: 0, after_retries: n });
+    }
+    case '853006':
+      return finish(err(853006, 'policy'), 1);
+    case '851003':
+      return finish(err(851003, 'no authority'), 1);
+    case 'other':
+      return finish(err(860001, 'something else'), 1);
+    case 'wrapped':
+      return finish({ error: { type: 'UnknownError', code: 893999, message: 'ApiError: grant expired [code=850003]' } }, 1);
+    default:
+      return finish({ errcode: 0 });
+  }
+})();

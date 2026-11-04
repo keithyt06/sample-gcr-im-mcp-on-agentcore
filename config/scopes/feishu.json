@@ -1,0 +1,38 @@
+{
+  "scopes": {
+    "tenant": [],
+    "user": [
+      "base:app:read",
+      "base:record:create",
+      "base:record:read",
+      "base:table:read",
+      "calendar:calendar.event:create",
+      "calendar:calendar.event:read",
+      "calendar:calendar.event:update",
+      "calendar:calendar.free_busy:read",
+      "contact:user.basic_profile:readonly",
+      "contact:user:search",
+      "docs:document.media:upload",
+      "docx:document:create",
+      "docx:document:readonly",
+      "docx:document:write_only",
+      "im:chat:read",
+      "im:message",
+      "im:message.group_msg:get_as_user",
+      "im:message.p2p_msg:get_as_user",
+      "im:message.reactions:read",
+      "im:message.send_as_user",
+      "mail:user_mailbox.message:modify",
+      "mail:user_mailbox.message:send",
+      "mail:user_mailbox:readonly",
+      "offline_access",
+      "search:docs:read",
+      "search:message",
+      "sheets:spreadsheet:read",
+      "sheets:spreadsheet:write_only",
+      "task:task:read",
+      "task:task:write",
+      "wiki:node:retrieve"
+    ]
+  }
+}

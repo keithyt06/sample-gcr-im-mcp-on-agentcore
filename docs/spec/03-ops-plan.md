@@ -19,7 +19,7 @@ No AWS resources were created or modified. Account IDs are masked as `<ACCT_GLOB
 | CFN schema: ProtocolConfiguration `MCP`, RequestHeaderAllowlist | present | present | present | present |
 | Existing AgentCore runtimes | 1 (unrelated name) | 1 (unrelated name) | 0 | 0 |
 | Existing `ImMcp-*` stacks | none | none | none | none |
-| CDK bootstrap (`CDKToolkit`) | yes, UPDATE_COMPLETE, BootstrapVersion **30** | yes, v**30** | **NO** | **NO** |
+| CDK bootstrap (`CDKToolkit`) | yes, UPDATE_COMPLETE, BootstrapVersion **30** | yes, v**30** | **NO** | yes, v**32** (bootstrapped 2026-11-04, CDK CLI 2.1147.0) |
 | AgentCore quotas (visible) | session creation 25/s, data plane 1000/s, control mutations 50/s, image max 2048 MB | same | same | same |
 | Lambda account concurrency | 1000 | 1000 | 1000 | 1000 |
 | ECR pull-through cache / replication | n/a | n/a | none | none |
@@ -80,8 +80,8 @@ and only matter if we want to copy the full multi-arch index byte-for-byte.
 Global default `BASE_IMAGE` = `public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:4b15…79da`
 (index digest; BuildKit selects arm64). For China, a `docker push` of a single-platform pull
 produces a **new** digest (the arm64 manifest only, re-pushed). Record the digest that `docker push`
-prints and pin China `BASE_IMAGE` to that. Expected to equal the arm64 manifest digest above when
-pushed unmodified; verify, don't assume.
+prints and pin China `BASE_IMAGE` to that. Verified 2026-11-04 in cn-northwest-1: the pushed digest
+equals the upstream arm64 manifest digest (`sha256:9a422d62…c4ecbc`, 79.9 MB compressed).
 
 ## 2. Bootstrap
 
@@ -247,8 +247,8 @@ China (cn-northwest-1 then cn-north-1, profile `gcr`):
 - [x] AgentCore Runtime API available; CFN resource type public; MCP protocol + header allowlist in schema
 - [x] ECR / Secrets Manager / KMS / DynamoDB / API GW v2 / Scheduler / Lambda / SSM APIs callable
 - [x] China ECR login works; npmmirror reachable
-- [ ] **CDK bootstrap** in the target region (needs approval; creates resources)
-- [ ] Base image mirrored + repo policy for the CDK image-publishing role (needs approval; creates resources)
+- [x] **CDK bootstrap** cn-northwest-1 (v32, 2026-11-04); cn-north-1 still pending
+- [x] Base image mirrored to cn-northwest-1 `gcr-im-mcp/base/node:22-bookworm-slim` (digest `sha256:9a422d62…c4ecbc` = arm64 manifest = CN_BASE_DIGEST; IMMUTABLE, scanOnPush) + repo policy for the CDK image-publishing role; cn-north-1 still pending
 - [ ] Lambda nodejs22.x/arm64 confirmed (first deploy; fallback nodejs20.x)
 - [ ] ICP status known. Without ICP, the default execute-api URL may be blocked; record the observed
       behavior and still count control-plane success (stack CREATE_COMPLETE, runtime READY,
