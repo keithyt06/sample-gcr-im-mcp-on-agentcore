@@ -1,0 +1,1066 @@
+# 02 — Technical Design: sample-gcr-im-mcp-on-agentcore
+
+Status: v1 (2026-11-04) · Owner: CTO · Audience: dev team (WP-A/B/C). This is the build contract.
+Inputs: team brief D1–D16, research v2, `01-product-spec.md`, `03-ops-plan.md`, team-lead decisions
+(2026-11-04), and the code of the three reference repos (read in full: Lark sample `infra/lib/*`,
+`lambda/**`, `docker/server*.js`; DingTalk `packages/remote/**`, `packages/shared/**`; WeCom
+`docker/lib/*`, `lambda/**`, `tools/*`), dws 1.0.67 source, wecom-cli 1.3.4 source.
+
+Words: **MUST** = contract (changing it needs a CTO sign-off). **Port** = copy the logic from the named
+reference file, convert it to TypeScript, and remove what this doc drops.
+
+---
+
+## 0. Decisions that refine the brief (read first)
+
+| # | Decision | Why |
+|---|---|---|
+| R1 | `tools/call` with no IM credential returns **HTTP 200 + a JSON-RPC tool result with `isError: true` and `authorize_url`**, not HTTP 403. `initialize`, `tools/list`, and `ping` are forwarded **without** an IM token | Streamable-HTTP clients treat 403 as a transport or step-up-auth failure and the LLM never sees the link. Forwarding `tools/list` without IM credentials is also what makes the infra-only E2E (G2a) possible |
+| R2 | The container is **healthy with no IM app secret**. It loads the secret lazily on the first `tools/call` | We have no real IM apps. The Lark sample returns 503 from `/ping` until the secret loads, which would block every E2E run |
+| R3 | Tool catalogs are **generated offline and committed** (`container/tools/<family>/catalog.json`) by `scripts/gen-catalog.ts` against the pinned CLI. The image does not inspect the CLI at build time | Builds are deterministic and need no QEMU-run CLI or Python in the image. A test pins `catalog.cliVersion` to `shared/versions.ts` |
+| R4 | The image has **no apt step**. lark-cli is installed with `npm i -g --ignore-scripts`, then `container/build/fetch-lark-binary.mjs` downloads the binary from the npm binary mirror and checks it against the package's `checksums.txt`. dws/wecom come from npm only | `node:*-slim` has no `curl`, which lark-cli's postinstall needs. Apt mirrors are the flakiest part of a China build. Nothing is fetched from GitHub (D10) |
+| R5 | Container TS is **bundled by esbuild at synth time** into `container/dist/server.mjs`, with the AWS SDK inlined. There is no `npm ci` in the image | One root `package.json`. The image needs nothing from the registry except the IM CLI |
+| R6 | Metrics use **CloudWatch Embedded Metric Format (EMF)** log lines, not MetricFilters | The Runtime log group `/aws/bedrock-agentcore/runtimes/<id>-DEFAULT` is created by the service, not by CFN, so a MetricFilter on it can fail at deploy time. EMF works on any log group |
+| R7 | **One DynamoDB table** (single-table, `pk` + TTL) for flows, codes, refresh tokens, identities, and users | Less IAM and fewer resources |
+| R8 | MCP access token TTL is **1 h**, plus a **rotating refresh token (90 d)** | OAuth 2.1. The Lark sample's 30-day bearer without refresh is too long-lived |
+| R9 | `ingress.edge: cloudfront` together with `ingress.customDomain` is **rejected in v1** | It needs a us-east-1 ACM certificate and an alias. Out of scope |
+| R10 | Secret names follow the PM docs: `<slug>/im-app`, `<slug>/root-key`, `<slug>/users/<userId>` | Same names in docs and code |
+| R11 | New root dir `shared/` (`contract.ts`, `versions.ts`), imported by infra, lambdas, and container | Header, env, and RPC names are defined once |
+| R12 | New config keys `oauth.extraRedirectHosts` (team lead) and `build.baseImage` (optional override) | Quick and corporate hosts. Base image for China builds of Global stacks |
+| R13 | Feishu/Lark uses the **v1 OIDC** token endpoints (as in the Lark sample, proven in production). DingTalk upstream uses **no PKCE** (dws itself uses a clientSecret exchange) | Use what is proven. DingTalk PKCE support is unverified |
+| R14 | Token refresh runs on an `events.Rule` (rate 30 min), not EventBridge Scheduler | Simpler L2. Both exist in China |
+| R15 | Base image is **Node 22** (`node:22-bookworm-slim`, digest pinned by Ops), not 24 | Matches the Ops pin and the Lambda runtime |
+
+---
+
+## 1. Repository layout (exact)
+
+```
+.
+├── package.json              # single package, all deps pinned exact, "type": "module"
+├── package-lock.json
+├── tsconfig.json             # strict, moduleResolution bundler, noEmit (esbuild/tsx do emitting)
+├── vitest.config.ts
+├── cdk.json                  # app: "npx tsx infra/bin/app.ts"; context below
+├── .gitignore                # cdk.out/, node_modules/, container/dist/, config/deploy.yaml, config/*.local.yaml, .cache/
+├── LICENSE NOTICE CODE_OF_CONDUCT.md CONTRIBUTING.md THIRD-PARTY-LICENSES README.md README.zh-CN.md
+├── config/
+│   ├── deploy.example.yaml   # documented example, all keys, no secrets, no account IDs
+│   └── scopes/feishu.json    # Feishu/Lark console bulk-import file (shared by lark); generated by gen-catalog
+├── shared/
+│   ├── contract.ts           # header names, env var names, RPC methods, error codes (§4.9)
+│   └── versions.ts           # CLI versions, base image refs (§3.6)
+├── infra/
+│   ├── bin/app.ts
+│   └── lib/
+│       ├── config.ts         # zod schema, loadConfig(path), derive(cfg)
+│       ├── regions.ts        # AGENTCORE_REGIONS allowlist
+│       ├── partition.ts      # partitionOf/urlSuffixOf/awsConsoleHost (RegionInfo-based)
+│       ├── names.ts          # every physical name from slug (§3.2)
+│       ├── stack.ts          # ImMcpStack (the one stack)
+│       ├── waf-stack.ts      # ImMcpWafStack (us-east-1, aws only, optional)
+│       ├── nag.ts            # cdk-nag AwsSolutions + documented acknowledgements
+│       ├── constructs/
+│       │   ├── storage.ts    # CMK, table, root-key secret, im-app secret
+│       │   ├── image.ts      # esbuild container bundle + DockerImageAsset
+│       │   ├── runtime.ts    # execution role + CfnRuntime
+│       │   ├── functions.ts  # shared Lambda factory (role, log group, bundling)
+│       │   ├── oauth.ts      # OAuth AS Lambda + grants
+│       │   ├── middleware.ts # MCP proxy Lambda + grants
+│       │   ├── refresh.ts    # refresh Lambda + 30-min rule (redirect IMs only)
+│       │   ├── ingress.ts    # HTTP API, routes, throttling, access logs, custom domain, CloudFront, base-url SSM param
+│       │   └── alarms.ts     # SNS topic, alarms, optional webhook Lambda
+│       └── adapters/
+│           ├── types.ts      # InfraAdapter
+│           ├── index.ts      # getInfraAdapter(im)
+│           ├── feishu.ts     # feishu + lark
+│           ├── dingtalk.ts
+│           └── wecom.ts
+├── lambda/
+│   ├── shared/
+│   │   ├── env.ts            # typed env reader (throws on missing)
+│   │   ├── keys.ts           # root key load (5-min cache) + derived keys
+│   │   ├── tokens.ts         # MCP access/incr tokens, DCR client_id, session id, code/refresh helpers
+│   │   ├── store.ts          # DynamoDB single-table ops
+│   │   ├── user-secrets.ts   # Secrets Manager per-user credential ops
+│   │   ├── app-secret.ts     # <slug>/im-app loader (+ placeholder detection)
+│   │   ├── base-url.ts       # SSM base-url param (5-min cache)
+│   │   ├── runtime-client.ts # SigV4 InvokeAgentRuntime + SSE parse
+│   │   ├── redirects.ts      # redirect_uri allowlist
+│   │   ├── http.ts           # json/html/redirect/sse response helpers
+│   │   ├── log.ts            # JSON logs + EMF metric()
+│   │   └── adapters/{types.ts,index.ts,feishu.ts,dingtalk.ts,wecom.ts}
+│   ├── oauth/
+│   │   ├── index.ts          # router
+│   │   ├── well-known.ts register.ts authorize.ts callback.ts token.ts qr.ts
+│   │   ├── pages.ts          # HTML (success/error/QR), CSP with nonce
+│   │   └── i18n.json         # en + zh strings (the only CJK in lambda/)
+│   ├── middleware/index.ts
+│   ├── refresh/index.ts
+│   └── alarm/index.ts        # SNS → IM bot webhook
+├── container/
+│   ├── Dockerfile
+│   ├── .dockerignore         # src/, **/*.test.*, node_modules
+│   ├── build/install-cli.sh  # case $IM → install the pinned CLI
+│   ├── build/fetch-lark-binary.mjs
+│   ├── src/
+│   │   ├── server.ts         # http server, /ping, /mcp, body limit, graceful shutdown
+│   │   ├── mcp.ts            # JSON-RPC dispatch: initialize, tools/list, tools/call, ping, im/*
+│   │   ├── catalog.ts        # load catalog + tier1, prefixing, discover search
+│   │   ├── cli-runner.ts     # execFile wrapper (timeout, maxBuffer, abort, child tracking)
+│   │   ├── semaphore.ts
+│   │   ├── errors.ts         # ToolError + envelope builder
+│   │   ├── metrics.ts        # EMF
+│   │   ├── secrets.ts        # SM client (im-app, wecom user blobs)
+│   │   ├── adapters/{types.ts,index.ts,feishu.ts,dingtalk.ts,wecom.ts}
+│   │   └── wecom/{auth-flow.ts,credentials.ts,identity.ts}
+│   ├── tools/
+│   │   ├── lark/{catalog.json,tier1.json}      # used by feishu AND lark
+│   │   ├── dingtalk/{catalog.json,tier1.json}
+│   │   └── wecom/{catalog.json,tier1.json}
+│   └── dist/                 # gitignored; esbuild output (server.mjs)
+├── scripts/
+│   ├── secret-set-im-app.ts  # npm run secret:set-im-app
+│   ├── mint-test-token.ts    # npm run mint-test-token
+│   ├── e2e-smoke.ts          # npm run e2e
+│   ├── users.ts              # npm run users -- list | revoke <userId>
+│   ├── gen-catalog.ts        # npm run gen:catalog -- --cli lark|dingtalk|wecom   (WP-C)
+│   └── mirror-base-image.sh  # Ops runbook §3, idempotent
+├── test/
+│   ├── fixtures/configs/{feishu,lark,dingtalk,wecom}-{aws,cn}.yaml
+│   ├── infra/{config,partition,matrix,iam,nag}.test.ts
+│   ├── lambda/{tokens,store,oauth-*,middleware,refresh,alarm,adapter-*}.test.ts
+│   └── container/{server,catalog,feishu,dingtalk,wecom,wecom-auth,dws-isolation}.test.ts + fakes/{lark-cli,dws,wecom-cli}
+└── docs/{spec,en,zh-CN}/
+```
+
+**Package decision:** one root `package.json`. No npm workspaces. Lambdas are bundled by
+`NodejsFunction`, which uses the local `esbuild` devDependency (it MUST be installed, or CDK falls back
+to Docker bundling). The container is bundled by `infra/lib/constructs/image.ts` with the esbuild API.
+
+`package.json` scripts (MUST exist with these names):
+
+| Script | Command |
+|---|---|
+| `build` | `tsc -p tsconfig.json` (typecheck only) |
+| `test` | `vitest run` |
+| `synth` | `cdk synth` |
+| `synth:matrix` | `vitest run test/infra/matrix.test.ts` (writes `cdk.out/matrix/<im>-<partition>.template.json`) |
+| `deploy` | `cdk deploy --all --require-approval never` |
+| `destroy` | `cdk destroy --all --force` |
+| `e2e` | `tsx scripts/e2e-smoke.ts` |
+| `secret:set-im-app` | `tsx scripts/secret-set-im-app.ts` |
+| `mint-test-token` | `tsx scripts/mint-test-token.ts` |
+| `users` | `tsx scripts/users.ts` |
+| `gen:catalog` | `tsx scripts/gen-catalog.ts` |
+
+Config path: `-c config=<path>` (default `config/deploy.yaml`). Example:
+`AWS_PROFILE=gcr AWS_REGION=cn-northwest-1 npm run deploy -- -c config=config/cn.local.yaml`.
+
+Dependencies (exact pins at scaffold, lockfile committed): `aws-cdk-lib@2.275.0`, `constructs@10.x`,
+`aws-cdk@2.1147.0` (dev), `zod@4.x`, `yaml`, `@aws-sdk/client-{secrets-manager,dynamodb,ssm,cloudformation}`,
+`@smithy/signature-v4`, `@smithy/protocol-http`, `@aws-crypto/sha256-js`, `@aws-sdk/credential-provider-node`;
+dev: `typescript@5.x`, `tsx`, `esbuild@0.28.x`, `vitest`, `aws-sdk-client-mock`, `cdk-nag`, `@types/node`.
+No MCP SDK: JSON-RPC is hand-written, as in all three references (proven behind AgentCore).
+
+`cdk.json` context: `"@aws-cdk/core:target-partitions": ["aws","aws-cn"]`,
+`"@aws-cdk/core:enablePartitionLiterals": true`, plus the current recommended feature flags.
+
+---
+
+## 2. Configuration
+
+### 2.1 Schema (`infra/lib/config.ts`, zod, every object `.strict()`)
+
+```ts
+const host = z.string().regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
+const scope = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$/);
+
+export const ConfigSchema = z.object({
+  region: z.string(),                                            // refine: in AGENTCORE_REGIONS
+  im: z.enum(['feishu', 'lark', 'dingtalk', 'wecom']),
+  slug: z.string().regex(/^[a-z][a-z0-9-]{1,18}[a-z0-9]$/),      // 3..20 chars
+  ingress: z.object({
+    customDomain: host.optional(),
+    certificateArn: z.string().regex(/^arn:aws(-cn)?:acm:[a-z0-9-]+:\d{12}:certificate\/[0-9a-f-]{36}$/).optional(),
+    edge: z.enum(['none', 'cloudfront']).default('none'),
+    waf: z.boolean().default(false),
+    rateLimit: z.object({
+      rps: z.number().int().min(1).max(10000).default(50),
+      burst: z.number().int().min(1).max(5000).default(100),
+      registerRps: z.number().int().min(1).max(100).default(5),
+      registerBurst: z.number().int().min(1).max(200).default(10),
+    }).strict().default({}),
+  }).strict().default({}),
+  runtime: z.object({
+    idleTimeoutSec: z.number().int().min(60).max(28800).default(600),
+    maxConcurrent: z.number().int().min(1).max(50).default(10),
+  }).strict().default({}),
+  build: z.object({
+    mirror: z.enum(['auto', 'cn', 'global']).default('auto'),
+    baseImage: z.string().regex(/^[\w.\-/:]+@sha256:[0-9a-f]{64}$/).optional(),   // full ref, digest-pinned
+  }).strict().default({}),
+  oauth: z.object({
+    extraRedirectHosts: z.array(z.string().regex(/^(\*\.)?[a-z0-9.-]+$/)).max(10).default([]),
+  }).strict().default({}),
+  alarm: z.object({
+    webhookUrlSsmParam: z.string().regex(/^\/[A-Za-z0-9_.\-/]{1,1000}$/).optional(),
+  }).strict().default({}),
+  imConfig: z.object({                                            // filled from top-level YAML blocks, see 2.2
+    feishu: z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]{8,32}$/), scopes: z.array(scope).max(300).optional() }).strict().optional(),
+    lark:   z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]{8,32}$/), scopes: z.array(scope).max(300).optional() }).strict().optional(),
+    dingtalk: z.object({ clientId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/), scopes: z.array(scope).max(50).optional() }).strict().optional(),
+    wecom: z.object({}).strict().optional(),
+  }).strict(),
+}).strict();
+```
+
+### 2.2 YAML shape (`config/deploy.example.yaml`)
+
+`im` is both the selector and the per-IM block, so the YAML uses `im:` (string) plus `imConfig`-style
+blocks under the **same top-level key names as the PM docs** (`im.feishu.appId`). To keep YAML legal,
+the file uses:
+
+```yaml
+region: ap-northeast-1
+im: feishu                     # feishu | lark | dingtalk | wecom
+slug: team-a
+feishu:   { appId: cli_xxxxxxxxxxxxxxxx }      # docs refer to this as im.feishu.appId
+# lark:     { appId: cli_xxxxxxxxxxxxxxxx, scopes: [offline_access, ...] }
+# dingtalk: { clientId: dingxxxxxxxxxxxx, scopes: [openid, corpid] }
+# wecom:    {}
+ingress:
+  # customDomain: mcp.example.com
+  # certificateArn: arn:<partition>:acm:<region>:<account-id>:certificate/<uuid>
+  edge: none
+  waf: false
+  rateLimit: { rps: 50, burst: 100, registerRps: 5, registerBurst: 10 }
+runtime: { idleTimeoutSec: 600, maxConcurrent: 10 }
+build: { mirror: auto }
+oauth: { extraRedirectHosts: [] }
+alarm: {}                      # webhookUrlSsmParam: /team-a/alarm-webhook
+```
+
+`loadConfig()` lifts the top-level `feishu|lark|dingtalk|wecom` blocks into `imConfig` before zod
+parses. **Docs keep saying `im.<im>.appId`**. WP-A adds a one-line note to `docs/en/prerequisites.md`
+and the zh-CN file: "written as a top-level `feishu:` block in YAML". (A YAML key can't be both a
+scalar and a map. This is the smallest fix.)
+
+### 2.3 Validation rules (superRefine; each failure message names the key and the fix)
+
+1. `region` ∈ `AGENTCORE_REGIONS` (`infra/lib/regions.ts`: the 21 Global regions in PM spec §5.2 plus `cn-north-1`, `cn-northwest-1`).
+2. The block named by `im` MUST exist (`lark` reuses the `lark` block, not `feishu`). Any other IM block present → error `"feishu: block present but im=dingtalk"`.
+3. Raw YAML keys (recursive) matching `/secret|token|password|passwd|apikey/i` → error `"secrets never go in config; use npm run secret:set-im-app"` (G3). `webhookUrlSsmParam` is allowed by name.
+4. Partition `aws-cn` and `ingress.edge === 'cloudfront'` → error `"ingress.edge: cloudfront is not available in AWS China regions"`.
+5. Partition `aws-cn` and `ingress.waf === true` → error `"ingress.waf is not available in AWS China regions (HTTP API has no WAF); API Gateway throttling applies"`.
+6. `ingress.waf` requires `ingress.edge: cloudfront`.
+7. `ingress.edge: cloudfront` together with `customDomain` → error (R9).
+8. `customDomain` and `certificateArn` must be set together. The ARN's partition and region MUST equal the derived partition and `region`.
+9. `rateLimit.burst >= rateLimit.rps`, `registerBurst >= registerRps`, `registerRps <= rps`.
+10. If the effective mirror is `cn` and the partition is `aws`, `build.baseImage` is required (the China ECR mirror lives in another partition).
+
+Defaults: `feishu|lark.scopes` = the `scopes.user` array of `config/scopes/feishu.json`. `dingtalk.scopes` = `['openid','corpid']`.
+
+### 2.4 Derived values (`derive(cfg)`; never in config)
+
+| Derived | Rule |
+|---|---|
+| `partition` | `RegionInfo.get(region).partition` (`aws` / `aws-cn`) |
+| `urlSuffix` | `RegionInfo.get(region).domainSuffix` (`amazonaws.com` / `amazonaws.com.cn`) |
+| `isChina` | `partition === 'aws-cn'` |
+| `awsConsoleHost` | `console.aws.amazon.com` / `console.amazonaws.cn` |
+| `agentcoreEndpoint` | `https://bedrock-agentcore.${region}.${urlSuffix}` |
+| `effectiveMirror` | `mirror === 'auto' ? (isChina ? 'cn' : 'global') : mirror` |
+| `npmRegistry` | cn → `https://registry.npmmirror.com`; global → `https://registry.npmjs.org` |
+| `baseImage` | `build.baseImage` ?? (cn → `${CDK_DEFAULT_ACCOUNT}.dkr.ecr.${region}.amazonaws.com.cn/${CN_BASE_REPO}@${CN_BASE_DIGEST}`; global → `GLOBAL_BASE_IMAGE`) |
+| `cliFamily` | feishu/lark → `lark`; dingtalk → `dingtalk`; wecom → `wecom` |
+| `authMode` | wecom → `qr`; else `redirect` |
+| `imConsoleCallbackHint` | feishu `https://open.feishu.cn/app/<appId>/safe`; lark `https://open.larksuite.com/app/<appId>/safe`; dingtalk `https://open-dev.dingtalk.com/fe/app`; wecom none |
+| `quickRedirectHosts` | aws → `['quicksight.aws.amazon.com','*.quicksight.aws.amazon.com']`; aws-cn → `[]` |
+
+If `CDK_DEFAULT_ACCOUNT` is unset (unit tests), the cn base image uses the literal `ACCOUNT` as a
+placeholder. Images are only built at deploy time, when the account is known.
+
+---
+
+## 3. Stack design
+
+### 3.1 App wiring (`infra/bin/app.ts`)
+
+```ts
+const cfg = loadConfig(app.node.tryGetContext('config') ?? 'config/deploy.yaml');
+const d = derive(cfg);
+const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: cfg.region };
+let waf: ImMcpWafStack | undefined;
+if (cfg.ingress.waf) waf = new ImMcpWafStack(app, `ImMcp-${cfg.slug}-Waf`, { env: { account: env.account, region: 'us-east-1' }, crossRegionReferences: true });
+const main = new ImMcpStack(app, `ImMcp-${cfg.slug}`, { env, cfg, d, webAclArn: waf?.webAclArn, crossRegionReferences: !!waf });
+if (waf) main.addDependency(waf);
+Tags.of(app).add('project', 'gcr-im-mcp-on-agentcore'); Tags.of(app).add('im-mcp:slug', cfg.slug);
+```
+
+### 3.2 Physical names (`infra/lib/names.ts`)
+
+| Resource | Name |
+|---|---|
+| Stack | `ImMcp-<slug>` (+ `ImMcp-<slug>-Waf`) |
+| Runtime | `im_mcp_<slug with - → _>` |
+| Secrets | `<slug>/im-app` (redirect IMs), `<slug>/root-key`, user `<slug>/users/<userId>` (runtime-created) |
+| SSM param | `/im-mcp/<slug>/base-url` |
+| Lambda fn / log group | `im-mcp-<slug>-{oauth,middleware,refresh,alarm}` / `/aws/lambda/<fn>` (30 d, DESTROY) |
+| API access log | `/aws/apigateway/im-mcp-<slug>-access` (30 d) |
+| HTTP API | `im-mcp-<slug>` |
+| SNS topic | `im-mcp-<slug>-alarms` |
+| Alarms | `im-mcp-<slug>-<region>-<name>` |
+| Metric namespace | `ImMcp/<slug>` |
+| DynamoDB table | CFN-generated name (passed by env) |
+| KMS alias | `alias/im-mcp-<slug>-users` |
+
+### 3.3 Resources (one stack; ✱ = conditional)
+
+| Construct | Resources |
+|---|---|
+| storage | `kms.Key UserSecretKey` (rotation on, RETAIN) + alias; `dynamodb.Table Oauth` (pk `pk`:S, TTL `ttl`, on-demand, AWS-managed SSE, PITR, DESTROY); `Secret RootKey` (`<slug>/root-key`, `generateSecretString {passwordLength:64, excludePunctuation:true}`); ✱`Secret ImApp` (`<slug>/im-app`, redirect IMs, `generateSecretString {secretStringTemplate:'{"configured":false}', generateStringKey:'appSecret'}`). The appId is **not** in the template, so changing it never regenerates the value |
+| image | esbuild bundle → `DockerImageAsset` (§3.6) |
+| runtime | `iam.Role RuntimeRole` + `CfnRuntime Runtime` (§3.5) |
+| oauth | Role, LogGroup, `NodejsFunction Oauth` |
+| middleware | Role, LogGroup, `NodejsFunction Middleware` |
+| refresh ✱ | Role, LogGroup, `NodejsFunction Refresh`, `events.Rule` rate(30 min) (redirect IMs) |
+| ingress | `HttpApi` (`createDefaultStage:true`, no CORS), routes (§4.1), stage overrides (throttle + access log), ✱`DomainName` + `ApiMapping`, ✱`cloudfront.Distribution` (aws + edge), `ssm.StringParameter BaseUrl` |
+| alarms | `sns.Topic` (enforceSSL), alarms (§6.4), ✱`NodejsFunction Alarm` + LambdaSubscription (if `webhookUrlSsmParam`) |
+| waf ✱ | `wafv2.CfnWebACL` (CLOUDFRONT scope): `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet`, rate rule 1000 per 5 min per IP |
+
+Outputs: `BaseUrl`, `McpUrl`, ✱`CallbackUrl`, ✱`ImConsoleCallbackHint`, ✱`CustomDomainTarget`
+(`regionalDomainName`), `RuntimeArn`, `AlarmTopicArn`, ✱`ImAppSecretName`, `RootKeySecretName`,
+`UserSecretPrefix`, `TableName`.
+
+### 3.4 Cycle avoidance (D7)
+
+- `BaseUrl` = `https://<customDomain>` if set, else `https://<distribution.domainName>` (edge), else
+  `httpApi.apiEndpoint`. It is written to SSM `/im-mcp/<slug>/base-url`. Lambdas get only the **param
+  name** (a literal) and the IAM ARN built from that literal, so they never depend on the API.
+- Lambdas get `RUNTIME_ARN = runtime.attrAgentRuntimeArn`, so Lambda → Runtime. The Runtime depends only
+  on the role, the image, the CMK, and the secrets, never on the API or the Lambdas.
+- The container never needs the base URL. The middleware sends the complete incremental-authorize URL
+  in a request header (§4.4).
+- Test `matrix.test.ts` asserts that the Runtime `EnvironmentVariables` contain no reference to any
+  `AWS::ApiGatewayV2::*` / `AWS::CloudFront::*` / `AWS::SSM::Parameter` logical ID.
+
+### 3.5 Runtime (`constructs/runtime.ts`), exact
+
+```ts
+new agentcore.CfnRuntime(this, 'Runtime', {
+  agentRuntimeName: names.runtime,
+  description: `IM MCP server (${cfg.im})`,
+  roleArn: role.roleArn,
+  agentRuntimeArtifact: { containerConfiguration: { containerUri: image.imageUri } },
+  networkConfiguration: { networkMode: 'PUBLIC' },
+  protocolConfiguration: 'MCP',
+  lifecycleConfiguration: { idleRuntimeSessionTimeout: cfg.runtime.idleTimeoutSec },
+  requestHeaderConfiguration: { requestHeaderAllowlist: [...RUNTIME_HEADERS] },   // shared/contract.ts
+  environmentVariables: runtimeEnv,                                               // table below
+  tags: { project: 'gcr-im-mcp-on-agentcore', slug: cfg.slug },
+});
+runtime.node.addDependency(role);   // inline policy must exist before the service validates the image pull
+```
+
+No `CfnRuntimeEndpoint`: we invoke the service-managed `DEFAULT` endpoint (the Lark sample hit a 409
+"version must be READY" with a custom endpoint).
+
+`RUNTIME_HEADERS` (all with the prefix `X-Amzn-Bedrock-AgentCore-Runtime-Custom-`):
+`User-Id`, `User-Token`, `Authorize-Url`, `Request-Id`, `Caller`.
+
+Runtime env (all plain strings or CMK/secret refs):
+
+| Var | Value | IMs |
+|---|---|---|
+| `IM` | cfg.im | all |
+| `SLUG`, `METRIC_NAMESPACE`, `MAX_CONCURRENT`, `AWS_REGION` | — | all |
+| `IM_APP_ID`, `IM_APP_SECRET_ID` | appId, `<slug>/im-app` | feishu, lark |
+| `DINGTALK_DWS_AGENTCODE` | `gcr-im-mcp-on-agentcore` | dingtalk |
+| `USER_SECRET_PREFIX`, `USER_SECRET_KMS_KEY_ARN` | `<slug>/users`, CMK ARN | wecom |
+
+Execution role (trust `bedrock-agentcore.amazonaws.com` in **both** partitions, with conditions
+`aws:SourceAccount = <account>` and `aws:SourceArn` like `arn:<p>:bedrock-agentcore:<r>:<a>:*`):
+
+| Actions | Resource |
+|---|---|
+| `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` | asset repo ARN (`image.repository.grantPull`) |
+| `ecr:GetAuthorizationToken` | `*` — **documented exception** (no resource-level permissions) |
+| `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams` | `arn:<p>:logs:<r>:<a>:log-group:/aws/bedrock-agentcore/runtimes/*` and `…:log-stream:*` |
+| `secretsmanager:GetSecretValue` | ImApp secret ARN (feishu, lark) |
+| `secretsmanager:GetSecretValue`, `PutSecretValue`, `CreateSecret`, `DescribeSecret`, `TagResource` | `arn:<p>:secretsmanager:<r>:<a>:secret:<slug>/users/*` (wecom) |
+| `kms:Encrypt`, `kms:Decrypt`, `kms:GenerateDataKey`, `kms:DescribeKey` | CMK (wecom) |
+
+No `bedrock:InvokeModel`, no X-Ray, no `cloudwatch:PutMetricData` (EMF goes through logs).
+
+### 3.6 Image (`constructs/image.ts`, `shared/versions.ts`)
+
+```ts
+// shared/versions.ts
+export const CLI = { lark: { pkg: '@larksuite/cli', version: '1.0.99' },
+                     dingtalk: { pkg: 'dingtalk-workspace-cli', version: '1.0.67' },
+                     wecom: { pkg: '@wecom/cli', version: '1.3.4', platformPkg: '@wecom/cli-linux-arm64' } } as const;
+export const GLOBAL_BASE_IMAGE = 'public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da';
+export const CN_BASE_REPO = 'gcr-im-mcp/base/node';
+export const CN_BASE_DIGEST = 'sha256:9a422d62743ffb1e6eb282549f4eae7ab89f7b926db1f136f4cba8be60e4ecbc'; // arm64 manifest; re-verify after mirror (Ops §3)
+export const LARK_BINARY_BASE = 'https://registry.npmmirror.com/-/binary/lark-cli';
+```
+
+Steps in `image.ts`:
+1. `esbuild.buildSync({ entryPoints:['container/src/server.ts'], bundle:true, platform:'node', target:'node22', format:'esm', outfile:'container/dist/server.mjs', banner:{js:"import{createRequire}from'module';const require=createRequire(import.meta.url);"}, sourcemap:'linked', minify:false })`. Run it once per process (memoized), so the 8-combo matrix test bundles once.
+2. `new DockerImageAsset(this,'Image',{ directory:'container', platform: Platform.LINUX_ARM64, buildArgs:{ BASE_IMAGE:d.baseImage, NPM_REGISTRY:d.npmRegistry, IM:cfg.im, CLI_PKG, CLI_VERSION, CLI_PLATFORM_PKG:'' |…, LARK_BINARY_BASE } })`.
+
+`container/Dockerfile` (no `# syntax=` line):
+
+```dockerfile
+ARG BASE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
+FROM ${BASE_IMAGE}
+ARG IM
+ARG CLI_PKG
+ARG CLI_VERSION
+ARG CLI_PLATFORM_PKG=
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG LARK_BINARY_BASE=https://registry.npmmirror.com/-/binary/lark-cli
+ENV NODE_ENV=production NO_UPDATE_NOTIFIER=1 npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false
+COPY build/ /build/
+RUN IM="$IM" CLI_PKG="$CLI_PKG" CLI_VERSION="$CLI_VERSION" CLI_PLATFORM_PKG="$CLI_PLATFORM_PKG" \
+    NPM_REGISTRY="$NPM_REGISTRY" LARK_BINARY_BASE="$LARK_BINARY_BASE" sh /build/install-cli.sh && rm -rf /build
+COPY dist/ /app/
+COPY tools/ /app/tools/
+ENV IM_TOOLS_DIR=/app/tools PORT=8000 DWS_NO_UPDATE_CHECK=1
+USER node
+EXPOSE 8000
+ENTRYPOINT ["node", "/app/server.mjs"]
+```
+
+`install-cli.sh` (`set -eu`):
+- feishu/lark: `npm i -g --registry=$NPM_REGISTRY --ignore-scripts "$CLI_PKG@$CLI_VERSION"`, then
+  `node /build/fetch-lark-binary.mjs`. The script reads `checksums.txt` from the installed package,
+  downloads `${LARK_BINARY_BASE}/v${V}/lark-cli-${V}-linux-arm64.tar.gz` with `fetch` (60 s timeout,
+  3 retries), checks sha256, and extracts with `tar` into `<pkg>/bin/` (same layout as the upstream
+  `install.js`). It ends with `lark-cli --version`.
+- dingtalk: `DWS_NO_SKILLS=1 npm i -g --registry=… "$CLI_PKG@$CLI_VERSION"`, then
+  `rm -rf "$(npm root -g)/dingtalk-workspace-cli/assets"` (≈130 MB of other-platform archives),
+  then `dws --version`.
+- wecom: `npm i -g --registry=… "$CLI_PKG@$CLI_VERSION" "$CLI_PLATFORM_PKG@$CLI_VERSION"`, then
+  `wecom-cli --version`.
+
+G4 check: the build log contains no `github.com`, `docker.io`, or `registry.npmjs.org` when the mirror is `cn`.
+
+---
+
+## 4. Wire protocols
+
+### 4.1 HTTP routes (HTTP API, payload format **2.0**)
+
+| Route | Lambda | Notes |
+|---|---|---|
+| `GET /.well-known/oauth-authorization-server` | oauth | RFC 8414 |
+| `GET /.well-known/oauth-protected-resource` and `…/mcp` | oauth | RFC 9728 |
+| `POST /register` | oauth | RFC 7591. Route throttle `registerRps/registerBurst` |
+| `GET /authorize` | oauth | |
+| `GET /authorize/status` | oauth | wecom QR polling. 404 for other IMs |
+| `GET /callback` | oauth | redirect IMs. 404 for wecom |
+| `POST /token` | oauth | |
+| `POST /mcp`, `GET /mcp`, `DELETE /mcp` | middleware | GET → 405 (no server-initiated SSE). DELETE → 204 |
+
+Stage `$default`: `DefaultRouteSettings {ThrottlingRateLimit: rps, ThrottlingBurstLimit: burst}`,
+`RouteSettings {"POST /register": {registerRps, registerBurst}}`, and JSON `AccessLogSettings`
+(requestId, ip, routeKey, status, responseLatency, integrationErrorMessage). The stage MUST
+`addDependency` on every route (RouteSettings refers to the route key).
+
+### 4.2 Keys and token formats (`lambda/shared/keys.ts`, `tokens.ts`)
+
+Root key R = the `<slug>/root-key` secret string. Domain-separated keys: `K_x = HMAC-SHA256(R, label)`.
+Labels: `mcp-token-v1`, `mcp-incr-v1`, `dcr-client-v1`, `runtime-session-v1`. Cache: 5 min.
+Rotating R (`put-secret-value`) invalidates every access token, client_id, and session mapping
+within 5 min (US-D6).
+
+| Artifact | Format | TTL | Storage |
+|---|---|---|---|
+| userId | 32 lowercase hex (`randomBytes(16)`). Never an IM id | — | `ident#…` maps IM uid → userId |
+| MCP access token | `base64url(`${userId}:${exp}:${hex(HMAC(K_token, `${userId}:${exp}`))}`)` | 3600 s | stateless |
+| Incremental token `t` | same shape with `K_incr` | 600 s | stateless |
+| DCR client_id | `c1.` + `base64url(JSON{r:redirect_uris,n:hex8,iat})` + `.` + `base64url(HMAC(K_dcr, payloadB64))` | none | stateless |
+| Authorization code | `base64url(randomBytes(32))` | 120 s | `code#sha256(code)` |
+| Refresh token | `r1.` + `base64url(randomBytes(32))` | 90 d, rotated on use | `refresh#sha256(rt)` |
+| Runtime session id | `'u-' + hex(HMAC(K_session, userId))` (66 chars) | — | — |
+
+Verification is constant-time (`timingSafeEqual` on equal-length buffers). Malformed input → invalid,
+never a throw.
+
+`tokens.ts` exports (WP-A's `mint-test-token` imports `mintAccessToken`):
+```ts
+export function deriveKeys(root: string): Keys;
+export function mintAccessToken(k: Keys, userId: string, ttlSec?: number, now?: number): string;
+export function verifyAccessToken(k: Keys, tok: string, now?: number): { userId: string } | null;
+export function mintIncrToken(k: Keys, userId: string, now?: number): string;
+export function verifyIncrToken(k: Keys, tok: string, now?: number): { userId: string } | null;
+export function signClientId(k: Keys, redirectUris: string[], now?: number): string;
+export function verifyClientId(k: Keys, clientId: string): { redirectUris: string[] } | null;
+export function runtimeSessionId(k: Keys, userId: string): string;
+```
+
+### 4.3 DynamoDB items (`store.ts`)
+
+| pk | Attributes | TTL |
+|---|---|---|
+| `flow#<state>` (state = 32 hex) | `kind: 'redirect'|'incremental'|'qr'`, `clientId?`, `redirectUri?`, `clientState?`, `codeChallenge?`, `userId?` (incremental/qr), `scopes`, `containerSessionId?` | now+600 |
+| `code#<sha256>` | `userId, clientId, redirectUri, codeChallenge, exp` | now+120 |
+| `refresh#<sha256>` | `userId, clientId, exp` | exp |
+| `ident#<im>#<imUid>` | `userId, createdAt, updatedAt` | — |
+| `user#<userId>` | `im, imUid?, createdAt, lastLoginAt, disabled?, replacedBy?` | — |
+
+Single-use consumption (flow, code, refresh) = `DeleteItem` with `ReturnValues: ALL_OLD`. Absent →
+invalid. Also check `exp` (TTL deletion is lazy). Identity creation uses `PutItem` with
+`attribute_not_exists(pk)`. On a conditional failure, re-read (race-safe).
+
+### 4.4 OAuth AS endpoints (`lambda/oauth`)
+
+`base` = SSM base-url. All JSON responses carry `Cache-Control: no-store`.
+
+- **Metadata:** `{issuer: base, authorization_endpoint: base+'/authorize', token_endpoint: base+'/token', registration_endpoint: base+'/register', response_types_supported:['code'], grant_types_supported:['authorization_code','refresh_token'], code_challenge_methods_supported:['S256'], token_endpoint_auth_methods_supported:['none'], scopes_supported:['mcp']}`.
+  PRM: `{resource: base+'/mcp', authorization_servers:[base], bearer_methods_supported:['header'], scopes_supported:['mcp']}`.
+- **`POST /register`:** JSON body ≤ 8 KB. `redirect_uris` has 1–5 strings, each ≤ 2000 chars, each
+  allowed by `redirects.ts`. Response 201 `{client_id, client_id_issued_at, client_name?, redirect_uris, token_endpoint_auth_method:'none', grant_types:['authorization_code','refresh_token'], response_types:['code']}`.
+  Errors are 400 `invalid_redirect_uri` / `invalid_client_metadata`.
+- **Redirect allowlist (`redirects.ts`):** (a) loopback `http(s)://127.0.0.1|localhost|[::1]` on any
+  port (matching ignores the port, RFC 8252 §7.3), no userinfo or fragment. (b) `https` with a host in
+  `quickRedirectHosts` (aws only) or `EXTRA_REDIRECT_HOSTS`. An entry `*.x.y` matches subdomains of
+  `x.y` only. Custom URI schemes are rejected (Cursor = loopback only).
+- **`GET /authorize` (client flow):** requires `response_type=code`, a `client_id` that verifies, a
+  `redirect_uri` ∈ client's `r` (loopback compare ignores port), and `code_challenge` with
+  `code_challenge_method=S256`. `state` is passed through. `scope` and `resource` are accepted and
+  ignored. Before redirect_uri is validated, errors are a 400 HTML page (never redirect). After that,
+  they go back as `redirect_uri?error=…&state=…`.
+  - redirect IMs: put `flow#<state>{kind:'redirect',…, scopes: IM_SCOPES}`, then 302 to `adapter.authorizeUrl({callbackUrl: base+'/callback', state, scopes})`.
+  - wecom: `userId = new`; `start = runtime.control('im/auth.start', {}, userId)`. Put `flow#<state>{kind:'qr', userId, containerSessionId:start.sessionId,…}`, then 200 QR HTML (§5.4).
+- **`GET /authorize?t=<incr>&extra_scope=a,b` (incremental, redirect IMs):** `t` verifies. Each scope
+  matches `^[a-z][a-z0-9_:.-]{1,100}$`, at most 50. `t` together with `redirect_uri` → 400. Flow
+  `{kind:'incremental', userId, scopes: IM_SCOPES ∪ extra}` → 302 to the IM.
+- **`GET /callback?code&state` (redirect IMs):** consume `flow#state` (missing → 400 HTML "link
+  expired, start again"). Call `adapter.exchangeCode`, then resolve `userId`:
+  `ident#<im>#<imUid>` → existing, else create new + `user#`. If the flow is incremental and
+  `userId !== flow.userId` → 403 HTML `identity_mismatch`. If `user#.disabled` → 403 HTML "access
+  revoked". Then `user-secrets.put(userId, tokens)` (Create with `KmsKeyId`, else Put, else Restore +
+  Put on pending deletion), with 3 retries and EMF `TokenStoreFailed` on final failure (→ 500 HTML).
+  For a client flow, put `code#…` and 302 to `redirect_uri?code=…&state=…`. For incremental, show the
+  200 success HTML (display name from `identity.displayName`).
+- **`GET /authorize/status?flow=<state>` (wecom):** read `flow#` with ConsistentRead (missing →
+  `{status:'expired'}`). Call `st = runtime.control('im/auth.status', {sessionId}, flow.userId)`. If
+  the status is not `authorized` but `DescribeSecret(<slug>/users/<userId>)` succeeds, treat it as
+  authorized (another microVM answered). On authorized, resolve identity `ident#wecom#<authorized_user_id>`:
+  - none → put the ident.
+  - exists with U0 ≠ U1 → point it at U1, set `user#U0 {disabled:true, replacedBy:U1}`, and
+    `DeleteSecret(U0, RecoveryWindowInDays:7)`.
+
+  Then delete the flow, put `code#…`, and return `{status:'authorized', redirect: redirect_uri?code&state}`.
+  Other statuses pass through (`pending|expired|failed`).
+- **`POST /token`:** form-encoded (JSON accepted too).
+  - `grant_type=authorization_code`: needs a `client_id` that verifies (else 401 `invalid_client`),
+    `code`, `redirect_uri` equal to the stored one, and `code_verifier` (43–128 chars) with
+    `S256(verifier) == codeChallenge`, and the stored `clientId` must equal `client_id`. Issue
+    `{access_token, token_type:'Bearer', expires_in:3600, refresh_token, scope:'mcp'}`. Update
+    `user#.lastLoginAt`.
+  - `grant_type=refresh_token`: consume `refresh#`. `client_id` must match, `exp` not passed,
+    `user#.disabled` falsy. Issue a new pair (rotation). Replay of a consumed token → `invalid_grant`.
+  - Errors use RFC 6749 names: `invalid_request` 400, `invalid_client` 401, `invalid_grant` 400,
+    `unsupported_grant_type` 400.
+
+### 4.5 Middleware → Runtime (`lambda/middleware`)
+
+1. Bearer missing → 401, `WWW-Authenticate: Bearer resource_metadata="<base>/.well-known/oauth-protected-resource/mcp"`.
+   Present but invalid → 401 with `Bearer error="invalid_token", resource_metadata="…"`.
+2. Root key, base-url, or SM throttle failure → 503 `{"error":"backend_unavailable"}` + `Retry-After: 2`.
+3. Body: one JSON object (≤ 1 MB). Parse error → 400 + JSON-RPC `-32700`. Array → 400 `-32600`.
+   `method` starting with `im/` → 400 `-32601` (control RPC is never reachable from clients).
+   No `id` (notification) → 202, no upstream call.
+4. Redirect IMs: `cred = userSecrets.get(userId)` (in-memory cache 60 s, max 500 entries).
+   Usable = `expiresAt - now > 120`. If not usable and `method === 'tools/call'` → 200 SSE with a
+   JSON-RPC result: `isError:true`, text = envelope `{ok:false,error:{code:'im_not_authorized', message, user_action, authorize_url: base+'/authorize?t='+incr}}`.
+   Any other method is forwarded without `User-Token`.
+5. Invoke: `POST {AGENTCORE_ENDPOINT}/runtimes/{encodeURIComponent(RUNTIME_ARN)}/invocations`, SigV4
+   (`service: bedrock-agentcore`, region), headers:
+   `Content-Type: application/json`, `Accept: application/json, text/event-stream`,
+   `Mcp-Session-Id: <runtimeSessionId(userId)>` (the client's value is ignored),
+   `…-User-Id: userId`, `…-User-Token: accessToken` (if any),
+   `…-Authorize-Url: <base>/authorize?t=<incr>` (redirect IMs), `…-Request-Id: <apigw requestId>`,
+   `…-Caller: mcp`. Timeout 28 s (AbortSignal).
+6. Response: status and body passed through, `Content-Type` passed through, plus
+   `Mcp-Session-Id: <runtimeSessionId>` and `Cache-Control: no-store`. Upstream 429 → 429 +
+   `Retry-After: 2`. Upstream 5xx or unexpected 4xx → 502 `{"error":"upstream_error"}` (log
+   status and body prefix). Abort → 504 `{"error":"upstream_timeout"}`.
+
+`runtime-client.ts` (shared with oauth):
+```ts
+export async function invokeRuntime(o: { method: string; params?: unknown; id?: number|string; userId: string; keys: Keys;
+  headers?: Partial<Record<RuntimeHeader, string>>; rawBody?: Buffer; timeoutMs?: number }): Promise<Response>;
+export async function control<T>(method: 'im/auth.start'|'im/auth.status', params: unknown, userId: string): Promise<T>; // parses single-frame SSE `data:` line, throws on JSON-RPC error
+```
+
+### 4.6 Container HTTP and JSON-RPC (`container/src/server.ts`, `mcp.ts`)
+
+- Listens on `0.0.0.0:8000`. `GET /ping` → `{"status":"Healthy"|"HealthyBusy","time_of_last_update":<epoch s>}`
+  (`HealthyBusy` while any wecom QR session is pending, so the microVM isn't reaped mid-scan).
+  `POST /mcp` takes JSON-RPC. Anything else → 404. Body ≤ 1 MB → else 413.
+- Every response is `200 text/event-stream` with one frame `event: message\ndata: <json>\n\n`
+  (proven behind AgentCore MCP mode). Notifications → 202 with no body.
+- `initialize` → `{protocolVersion: client's if in ['2025-06-18','2025-03-26','2024-11-05'] else '2025-03-26', capabilities:{tools:{listChanged:false}}, serverInfo:{name:'gcr-im-mcp-on-agentcore', version, cli:{name, version}}, instructions}`.
+- `tools/list` → tier-1 tools (prefixed `<im>_`) + `<im>_discover` + `<im>_invoke`, each with
+  `annotations` derived from `risk`.
+- `tools/call` → §5.3 executor. `ping` → `{}`.
+- `im/auth.start`, `im/auth.status` → only if `…-Caller: control` and IM is wecom. Otherwise `-32601`.
+- Headers are trusted because the container is reachable only through SigV4 `InvokeAgentRuntime`.
+  This trust boundary goes in `docs/en/security.md`.
+
+### 4.7 Error mapping
+
+HTTP level (middleware): 401 / 503 / 400 / 202 / 429 / 502 / 504 as in §4.5.
+
+Tool level (container): `result.isError = true`, `content[0].text = JSON.stringify(envelope)`.
+Envelope: `{ok:false, error:{code, message, user_action?, authorize_url?, required_scopes?, im_code?, retry_after_sec?}}`.
+
+| `code` | Trigger | `user_action` (English; LLM translates) |
+|---|---|---|
+| `im_not_authorized` | no credential (middleware), wecom blob missing | Open `authorize_url` (redirect) / reconnect the MCP server (wecom) |
+| `missing_scope` | lark 99991679/99991676/99991672 or typed `missing_scope`; dws exit 4 or `category:'permission'` | Open `authorize_url` (= header URL + `&extra_scope=`). Feishu/Lark: an admin may need to enable the scope and publish a version first |
+| `im_reauth_required` | lark 99991668 / "token is expired|invalid"; dws exit 2 | Disconnect and reconnect the MCP server |
+| `im_admin_action_required` | dws output contains `cli_not_enabled` / `user_forbidden` | Ask the DingTalk admin to enable CLI access (open-dev → CLI access management) / approve the user |
+| `im_grant_expired` | wecom 850003. Also emits EMF `ImGrantExpired=1` | Renew this capability in the WeCom client → smart-bot management page. Do not re-scan. Do not create a new bot |
+| `im_rate_limited` | wecom 850005 after retries | Wait about 60 s |
+| `im_policy_blocked` | wecom 853006 | Chat history is not available in orgs with more than 10 members (platform policy) |
+| `im_object_permission` | wecom 851003 | The bot can only write objects it created or was added to. Create the doc with the bot, then add the user |
+| `im_app_not_configured` | im-app secret has `configured !== true` | Operator runs `npm run secret:set-im-app` |
+| `user_approval_required` | `risk==='high-risk-write'` and `args._confirm !== true` (`isError:false`) | Confirm with the user, then retry with `_confirm: true` |
+| `invalid_argument` / `unknown_tool` | input validation (`isError:false`, so the LLM self-corrects) | — |
+| `timeout` / `output_too_large` / `server_busy` / `cli_failed` | runner | Narrow the query / retry |
+
+### 4.8 Session model
+
+One AgentCore session (microVM) per user: `Mcp-Session-Id` = `runtimeSessionId(userId)`. For wecom,
+`im/auth.start` and `im/auth.status` for the same flow therefore reach the same microVM. Idle reaping
+follows `runtime.idleTimeoutSec`.
+
+### 4.9 `shared/contract.ts` (frozen names)
+
+```ts
+export const HDR_PREFIX = 'X-Amzn-Bedrock-AgentCore-Runtime-Custom-';
+export const H = { userId: `${HDR_PREFIX}User-Id`, userToken: `${HDR_PREFIX}User-Token`, authorizeUrl: `${HDR_PREFIX}Authorize-Url`,
+                   requestId: `${HDR_PREFIX}Request-Id`, caller: `${HDR_PREFIX}Caller` } as const;
+export const RUNTIME_HEADERS = Object.values(H);
+export const CONTROL_METHODS = ['im/auth.start', 'im/auth.status'] as const;
+export const ERROR_CODES = ['im_not_authorized','missing_scope','im_reauth_required','im_admin_action_required','im_grant_expired',
+  'im_rate_limited','im_policy_blocked','im_object_permission','im_app_not_configured','user_approval_required','invalid_argument',
+  'unknown_tool','timeout','output_too_large','server_busy','cli_failed'] as const;
+export const ENV = { /* every env var name in §3.5 and §6.2 */ } as const;
+export type Im = 'feishu'|'lark'|'dingtalk'|'wecom';
+export const METRICS = ['TokenStoreFailed','TokenLost','RefreshFailed','RefreshRevoked','ImGrantExpired','ImRateLimited'] as const;
+```
+
+---
+
+## 5. Adapters
+
+### 5.1 Lambda side (`lambda/shared/adapters/types.ts`)
+
+```ts
+export interface ImApp { appId: string; appSecret: string }              // dingtalk: clientId/clientSecret mapped here
+export interface ImTokenSet { accessToken: string; refreshToken?: string; expiresAt: number; issuedAt: number; scope?: string }
+export interface ImIdentity { imUid: string; displayName?: string }
+export type RefreshResult = { ok: true; tokens: ImTokenSet } | { ok: false; revoked: boolean; reason: string };
+export interface RedirectAdapter {
+  readonly mode: 'redirect'; readonly im: 'feishu'|'lark'|'dingtalk';
+  authorizeUrl(p: { appId: string; callbackUrl: string; state: string; scopes: string[] }): string;
+  exchangeCode(p: { code: string; callbackUrl: string; app: ImApp }): Promise<{ tokens: ImTokenSet; identity: ImIdentity }>;
+  refresh(p: { refreshToken: string; app: ImApp }): Promise<RefreshResult>;
+}
+export interface QrAdapter { readonly mode: 'qr'; readonly im: 'wecom' }
+export type LambdaAdapter = RedirectAdapter | QrAdapter;
+export function getLambdaAdapter(im: Im, deps?: { fetch?: typeof fetch; now?: () => number }): LambdaAdapter;
+```
+
+The user secret JSON (redirect IMs) is `ImTokenSet` plus `{im, imUid}`. Every upstream `fetch` has a
+10 s timeout. Non-JSON bodies parse safely and become a failure, never a throw → 502 (port
+`parseJsonSafe` from the Lark sample).
+
+**feishu / lark** (`feishu.ts`, brand = im). Hosts: feishu `accounts.feishu.cn` / `open.feishu.cn`;
+lark `accounts.larksuite.com` / `open.larksuite.com`.
+- authorize: `https://<accounts>/open-apis/authen/v1/authorize?client_id=<appId>&response_type=code&redirect_uri=<cb>&state=<state>&scope=<space-joined>`.
+- app token: `POST https://<open>/open-apis/auth/v3/app_access_token/internal {app_id, app_secret}` (cached 90 min).
+- exchange: `POST https://<open>/open-apis/authen/v1/oidc/access_token` (Bearer app token)
+  `{grant_type:'authorization_code', code}` → `data.{access_token, refresh_token, expires_in, open_id, scope}`.
+  imUid = `open_id`. displayName from `GET /open-apis/authen/v1/user_info` (best effort).
+- refresh: `POST …/authen/v1/oidc/refresh_access_token {grant_type:'refresh_token', refresh_token}`.
+  `code ∈ {20016, 20017, 20064}` → `revoked:true` (from the reference; re-verify during G2b).
+
+**dingtalk** (`dingtalk.ts`).
+- authorize: `https://login.dingtalk.com/oauth2/auth?client_id=<clientId>&redirect_uri=<cb>&response_type=code&scope=<space-joined>&state=<state>&prompt=consent`. No PKCE (R13).
+- exchange and refresh: `POST https://api.dingtalk.com/v1.0/oauth2/userAccessToken` JSON
+  `{clientId, clientSecret, code, grantType:'authorization_code'}` / `{clientId, clientSecret, refreshToken, grantType:'refresh_token'}`
+  → `{accessToken, refreshToken, expireIn | expiresIn}` (accept both). HTTP 4xx on refresh → `revoked:true`.
+- identity: `GET https://api.dingtalk.com/v1.0/contact/users/me` header `x-acs-dingtalk-access-token`
+  → imUid = `unionId` (fallback `openId`; missing → error). displayName = `nick`.
+
+**wecom**: `QrAdapter`. Auth logic lives in `oauth/qr.ts` + the container.
+
+### 5.2 Infra side (`infra/lib/adapters/types.ts`)
+
+```ts
+export interface InfraAdapter {
+  im: Im; authMode: 'redirect'|'qr'; cliFamily: 'lark'|'dingtalk'|'wecom';
+  needsAppSecret: boolean;                    // feishu, lark, dingtalk
+  appId(cfg: Config): string | undefined;     // appId / clientId
+  scopes(cfg: Config): string[];
+  runtimeEnv(cfg: Config, ctx: { appSecretName?: string; cmkArn: string }): Record<string, string>;
+  runtimeWritesUserSecrets: boolean;          // wecom
+  needsRefresh: boolean;                      // redirect IMs
+  imConsoleCallbackHint(cfg: Config): string | undefined;
+}
+```
+
+### 5.3 Container side (`container/src/adapters/types.ts`)
+
+```ts
+export type Risk = 'read' | 'write' | 'high-risk-write';
+export interface FlagSpec { name: string; key: string; type: 'string'|'bool'|'int'|'stringArray'; required: boolean }
+export interface CatalogTool {
+  name: string;                      // UNPREFIXED, e.g. 'im_messages_send', 'chat_message_send', 'calendar_schedules_create'
+  description: string; inputSchema: Record<string, unknown>; risk: Risk;
+  cli: { path: string[]; argStyle: 'flags'|'json'; flags?: FlagSpec[]; supportsYes?: boolean };
+  scopes?: string[]; category: string; unavailable?: string;   // unavailable = reason (file-path tools)
+}
+export interface Catalog { family: 'lark'|'dingtalk'|'wecom'; cliVersion: string; generatedAt: string; tools: CatalogTool[] }
+export interface CallContext { userId: string; userToken?: string; authorizeUrl?: string; requestId: string; signal: AbortSignal; deadline: number }
+export interface Prepared { env: NodeJS.ProcessEnv; cwd: string; dispose(): Promise<void> }
+export interface CliRun { exitCode: number|null; stdout: string; stderr: string; timedOut: boolean; overflow: boolean; aborted: boolean }
+export interface ToolResult { content: { type: 'text'; text: string }[]; isError?: boolean; _meta?: Record<string, unknown> }
+export interface ContainerAdapter {
+  readonly im: Im; readonly bin: string; readonly needsUserToken: boolean;
+  init(): Promise<void>;                                            // MUST NOT throw (R2)
+  prepare(ctx: CallContext): Promise<Prepared>;                     // throws ToolError
+  argv(tool: CatalogTool, args: Record<string, unknown>, ctx: CallContext): string[];   // throws ToolError('invalid_argument')
+  mapResult(run: CliRun, tool: CatalogTool, ctx: CallContext): ToolResult;
+  retryable?(run: CliRun): number | undefined;                      // ms to wait, wecom 850005
+  controlRpc?(method: string, params: unknown, ctx: CallContext): Promise<unknown>;
+}
+```
+
+Executor (`mcp.ts`, generic): resolve the tool (tier-1 by prefixed name, or `<im>_invoke`
+`tool_name` with or without prefix) → `unavailable` → `invalid_argument` with the reason →
+confirm gate → semaphore(`MAX_CONCURRENT`, queue 20, else `server_busy`) → `prepare` → `argv` →
+`runCli(bin, argv, {env, cwd, timeoutMs: min(24000, deadline-now), maxBuffer: 4 MB, signal})` →
+optional retry → `mapResult` → `dispose` (always, in `finally`). Child processes are tracked. On
+SIGTERM: stop accepting, wait 5 s, SIGTERM children, wait 2 s, SIGKILL, exit 0 (port from the Lark sample).
+
+`<im>_discover {query?: string, category?: string, limit?: 1..20=10}`: score = matching terms in
+`name + description + category` (lowercased, split on non-alphanumerics; exact name = top hit),
+excluding tier-1. Returns `{tools:[{name(prefixed), description, inputSchema, risk, unavailable?}]}`.
+`<im>_invoke {tool_name: string, args: object}`.
+
+The base env for every CLI call contains **only** `PATH, HOME, LANG=C.UTF-8, NO_COLOR=1` plus the
+adapter's additions. The container's AWS credentials and other process env are never passed through.
+
+**feishu / lark** (`feishu.ts`, bin `lark-cli`, `needsUserToken`).
+- prepare: lazy-load `IM_APP_SECRET_ID` (cache 30 min; `configured!==true` → `im_app_not_configured`).
+  `cwd = mkdtemp(/tmp/lark-)`. env + `LARKSUITE_CLI_USER_ACCESS_TOKEN=userToken`,
+  `LARKSUITE_CLI_APP_ID`, `LARKSUITE_CLI_APP_SECRET`, `LARKSUITE_CLI_BRAND=<im>`,
+  `LARKSUITE_CLI_DEFAULT_AS=user`.
+- argv: `[...path, ...flags]`. bool → `--name` if true. stringArray → repeated `--name v`, and a
+  comma-joined string → `invalid_argument` (port the Lark check). Object values →
+  `JSON.stringify`. `--yes` when high-risk and `supportsYes`.
+- mapResult: strip the CLI notice prefix, parse JSON (port `extractJson`). Permission patch: missing
+  scopes from `error.missing_scopes`, else `tool.scopes`, else regex on the message. Then auth
+  detection. Then success → text = stdout.
+
+**dingtalk** (`dingtalk.ts`, bin `dws`, `needsUserToken`).
+- prepare: `tmp = mkdtemp(/tmp/dws-)`, env + `DWS_CONFIG_DIR=<tmp>/config`,
+  `DWS_KEYCHAIN_DIR=<tmp>/keychain` (empty, per call: defense in depth even with `--token`),
+  `DWS_NO_UPDATE_CHECK=1`, `DINGTALK_DWS_AGENTCODE`. `HOME` stays the shared `/home/node` (discovery
+  and schema caches are not user credentials). `cwd = <tmp>/work`.
+- argv: `['--token', userToken, ...path, '-y', '-f', 'json', ...flags]`. dws 1.0.67 `flags.go:61`:
+  the root persistent `--token` wins over the keychain (`access_token_resolve.go:103`).
+  `--token` is the ONLY injection mode in v1. The per-user HOME/keychain fallback (D11) is documented
+  but not built unless the isolation test fails.
+- mapResult: JSON from stdout, else stderr. exit 4 or `category:'permission'` / `reason:'missing_scope'`
+  → `missing_scope` (port `parsePATError`/`extractScopes` from DingTalk `shared/src/errors.mjs`).
+  exit 2 → `im_reauth_required`. Text contains `cli_not_enabled|user_forbidden|user_not_allowed` →
+  `im_admin_action_required`.
+
+**wecom** (`wecom.ts` + `wecom/*`, bin `wecom-cli`, `needsUserToken=false`).
+- prepare (port `credentials.js` `withCredentials`, split into prepare/dispose): take the per-user
+  in-process lock. Load blob `{credentials_enc, encryption_key}` from `<USER_SECRET_PREFIX>/<userId>`
+  (missing → `im_not_authorized`). `cfg = mkdtemp($HOME/.wc/)` (0700, **outside** the CLI sandbox:
+  not cwd, not system tmp), write `credentials.enc` and `.encryption_key` (0600). Record the mtime
+  in ns. `cwd = mkdtemp(/tmp/wcw-)`. env + `WECOM_CLI_CONFIG_DIR=<cfg>`,
+  `WECOM_CLI_LOG_DIR=<cfg>/logs`, `WECOM_CLI_LOG_LEVEL=warn`. Never set `WECOM_CLI_ACCESS_TOKEN`
+  (no silent refresh) or `WECOM_CLI_TMP_DIR` (removed in 1.3.0).
+  dispose: if the `credentials.enc` mtime changed, write back with `PutSecretValue` (log `CRITICAL`
+  on failure), rm both dirs, release the lock.
+- argv: `[...method.split('.'), '--json', JSON.stringify(args)]`.
+- mapResult: port `extractCliError` / `stripIdentityContext` (`extra_identity_context` removed from
+  data, put into `_meta.wecom_identity`). Map codes 850003 (+ EMF), 850005, 853006, 851003. Other
+  `error.code` → `cli_failed` with `im_code`.
+- retryable: 850005 → wait 1500 ms then 4000 ms, if the deadline allows.
+- `unavailable`: methods with file-path inputs (`media.upload`, `*.files.upload`, `*.images.upload`,
+  `doc.import`, `sheet.import`, and anything with an `--output*` path). They are never executed and
+  never in tier 1.
+- controlRpc (port `auth.js`): `im/auth.start {}` → existing blob → `{status:'already_authorized'}`.
+  Otherwise reuse the user's pending session, or spawn
+  `wecom-cli auth init --noninteractive --no-browser --output-qrcode qr.png` with
+  `cwd = mkdtemp(/tmp/wca-)` and `WECOM_CLI_CONFIG_DIR = mkdtemp($HOME/.wc/auth-)`. Wait ≤ 20 s for
+  the URL `https://work.weixin.qq.com/ai/qc/gen?…` on stdout or stderr (ANSI stripped). Read `qr.png`
+  as base64 (best effort). Return `{status:'pending', sessionId, authorizeUrl, qrPngBase64, expiresAt}`.
+  On exit 0: read the blob, run the identity probe (`contact.users.search {keyword:'__im_mcp_identity_probe__'}`
+  with the new config dir), save the blob with `CreateSecret` (KmsKeyId = CMK, tags) or Put, state
+  `authorized`. Exit with 893202 → `expired`. Else `failed` (with the parsed reason). The poll timeout
+  is 300 s, matching the CLI. Terminal sessions are kept for 120 s.
+  `im/auth.status {sessionId?}` → `{status, sessionId, wecomIdentity?:{userId,userName,botId}, reason?}` or `{status:'unknown'}`.
+
+### 5.4 WeCom QR page (`lambda/oauth/pages.ts`)
+
+The page shows an inline `<img src="data:image/png;base64,…">` (or the link if there is no PNG), the
+instruction "choose **bind existing bot** if you authorized before", and a nonce'd script that polls
+`/authorize/status?flow=<state>` every 2 s for up to 310 s and then `location.replace(redirect)`.
+CSP: `default-src 'none'; img-src data:; style-src 'nonce-N'; script-src 'nonce-N'; connect-src 'self'`.
+Language comes from `Accept-Language` (`en` default, `zh`). Strings live in `i18n.json`.
+
+### 5.5 Tier 1 and catalogs
+
+| Family | Source | Tier 1 |
+|---|---|---|
+| lark | port the Lark `generate-tools.js` + `generate-tools-lib.js` shortcut parsing (`lark-cli <svc> --help`, `<svc> <cmd> --help`). Scopes from the Lark `shortcut-scopes.json` (copied to `scripts/data/lark-shortcut-scopes.json`) | Lark `tier1.json` (28) **minus** `drive_upload`, `drive_download` (file paths) = 26, unprefixed |
+| dingtalk | port DingTalk `generate-catalog.mjs` (help-tree walk) against **1.0.67** | DingTalk `tier1.json` (30). Names that no longer resolve in 1.0.67 are replaced with the closest command and listed in the PR. Aliases dropped |
+| wecom | port `extract-schemas.py` + `to_mcp_schema.py` (`wecom-cli <svc> --schema`, `<method…> --schema`) | WeCom `tier1.txt` minus file-path methods, names = method with `.` → `_` |
+
+`gen-catalog.ts` installs the pinned CLI into `.cache/cli/<family>` (npm `--prefix`, the host
+platform build), writes `catalog.json`, and validates that every tier-1 name resolves. For lark it
+also writes `config/scopes/feishu.json` =
+`{"scopes":{"tenant":[],"user":[ "offline_access", …union(tier1 scopes) ]}}` (sorted).
+
+**Dropped from the references (not ported):** the Lark skills engine (`list_skills`/`get_skill`,
+`docker/skills/**`), `exec_script`, raw-API tools (`lark api …`), `--print-schema` payload schemas,
+`runBaseCreateTransaction`, `translateCliError` self-correction, the fleet/roll-up dashboard,
+mutation testing (stryker), knip/lefthook/semgrep configs, i18n dashboards and alarm presets, CMK
+migration, Security-Agent domain verification, the default-slug sentinel naming, the Quick fixed
+client and client_secret auth, DingTalk deprecated aliases and the d1/d3 inject strategies, the WeCom
+static bearer map (`WECOM_BEARER_TOKENS`) and `/auth/start` HTTP routes, and every bash deploy script.
+
+---
+
+## 6. Lambdas and alarms
+
+### 6.1 Lambda factory (`constructs/functions.ts`)
+
+`NodejsFunction` with: `runtime NODEJS_22_X`, `architecture ARM_64`, explicit `logGroup`, **own role**
+(no `AWSLambdaBasicExecutionRole`) with `logs:CreateLogStream` and `logs:PutLogEvents` on
+`<logGroupArn>:*`, `bundling { target:'node22', format: CJS, minify:true, sourceMap:true, externalModules:[] }`
+(SDK bundled = pinned), `environment` from §6.2, and no reserved concurrency (API throttling bounds
+it; new accounts may have a low concurrency quota). Sizes: oauth 256 MB / 29 s; middleware
+512 MB / 29 s; refresh 256 MB / 300 s; alarm 128 MB / 10 s.
+
+### 6.2 Lambda env and IAM (`<p>/<r>/<a>` = partition/region/account)
+
+| Fn | Env | IAM (action → resource) |
+|---|---|---|
+| oauth | `IM, SLUG, BASE_URL_PARAM, ROOT_KEY_SECRET_ID, TABLE_NAME, USER_SECRET_PREFIX, USER_SECRET_KMS_KEY_ARN, IM_APP_ID?, IM_APP_SECRET_ID?, IM_SCOPES?, RUNTIME_ARN?, AGENTCORE_ENDPOINT?, EXTRA_REDIRECT_HOSTS, QUICK_REDIRECT_HOSTS, METRIC_NAMESPACE` | `secretsmanager:GetSecretValue` → root-key ARN (+ im-app ARN, redirect). Redirect: `secretsmanager:{GetSecretValue,CreateSecret,PutSecretValue,RestoreSecret,DescribeSecret,TagResource}` → `arn:<p>:secretsmanager:<r>:<a>:secret:<slug>/users/*`; `kms:{Encrypt,GenerateDataKey,Decrypt,DescribeKey}` → CMK. Wecom: `secretsmanager:{DescribeSecret,DeleteSecret}` → users/*; `bedrock-agentcore:InvokeAgentRuntime` → `RUNTIME_ARN`, `RUNTIME_ARN/*`. All: `dynamodb:{GetItem,PutItem,DeleteItem,UpdateItem}` → table ARN; `ssm:GetParameter` → `arn:<p>:ssm:<r>:<a>:parameter/im-mcp/<slug>/base-url` |
+| middleware | `IM, SLUG, BASE_URL_PARAM, ROOT_KEY_SECRET_ID, USER_SECRET_PREFIX, RUNTIME_ARN, AGENTCORE_ENDPOINT, NEEDS_USER_TOKEN, METRIC_NAMESPACE` | `secretsmanager:GetSecretValue` → root-key (+ users/* redirect); `kms:Decrypt` → CMK (redirect); `bedrock-agentcore:InvokeAgentRuntime` → runtime ARN, ARN/*; `ssm:GetParameter` → base-url param |
+| refresh | `IM, USER_SECRET_PREFIX, USER_SECRET_KMS_KEY_ARN, IM_APP_ID, IM_APP_SECRET_ID, METRIC_NAMESPACE` | `secretsmanager:ListSecrets` → `*` (**documented exception**: no resource-level permissions; the code filters by name prefix); `secretsmanager:{GetSecretValue,PutSecretValue,DescribeSecret,DeleteSecret}` → users/*; `GetSecretValue` → im-app; `kms:{Encrypt,Decrypt,GenerateDataKey,DescribeKey}` → CMK |
+| alarm | `WEBHOOK_URL_PARAM, IM, SLUG` | `ssm:GetParameter` → `arn:<p>:ssm:<r>:<a>:parameter<webhookUrlSsmParam>` (SecureString on `aws/ssm` works through the key policy; customer CMKs are not supported, documented) |
+
+`Resource: "*"` appears only for `ecr:GetAuthorizationToken` and `secretsmanager:ListSecrets`.
+`test/infra/iam.test.ts` enforces exactly this allowlist.
+
+### 6.3 Refresh (`lambda/refresh`, port of the Lark `refreshUser`)
+
+Every 30 min: `ListSecrets` (filter name `<prefix>/`, paginate, single-segment regex). Concurrency 5.
+For each secret: skip if `expiresAt - now > (expiresAt - issuedAt)/2`. Preflight write (Get + Put
+same value). `adapter.refresh`.
+- `revoked` → `DeleteSecret(RecoveryWindowInDays:7)` + EMF `RefreshRevoked`.
+- failure → EMF `RefreshFailed`.
+- success → Put with 5 retries (exponential backoff + jitter). The final failure → `CRITICAL store_token_lost` + EMF `TokenLost`.
+
+It ends with one `refresh_cycle` log `{refreshed, failed, revoked, skipped, total}`.
+
+### 6.4 Alarms (`constructs/alarms.ts`; all → SNS topic)
+
+| Alarm | Metric | Threshold |
+|---|---|---|
+| token-lost (redirect) | EMF `TokenLost` Sum, 5 min | ≥ 1, 1 period |
+| refresh-failed (redirect) | EMF `RefreshFailed` Sum, 30 min | ≥ 3 |
+| grant-expired (wecom) | EMF `ImGrantExpired` Sum, 5 min | ≥ 1 |
+| {oauth,middleware,refresh}-errors | Lambda `Errors` Sum, 5 min | ≥ 1 |
+| api-5xx | `AWS/ApiGateway` `5xx` (ApiId, Stage `$default`) Sum, 5 min | ≥ 5 |
+
+`treatMissingData: NOT_BREACHING`. The SNS topic is unencrypted with `enforceSSL` (CloudWatch can't
+publish to an `aws/sns`-encrypted topic; nag acknowledgement with the reason). If
+`alarm.webhookUrlSsmParam` is set, the alarm Lambda posts on each ALARM/OK transition. The body is
+picked by `IM`: feishu/lark `{"msg_type":"text","content":{"text":…}}`; dingtalk/wecom
+`{"msgtype":"text","text":{"content":…}}`. Text = `[<slug>/<region>] <AlarmName> <NewStateValue>: <NewStateReason>`.
+Timeout 5 s, no retries (SNS retries).
+
+EMF (`log.ts` / `metrics.ts`): `{"_aws":{"Timestamp":ms,"CloudWatchMetrics":[{"Namespace":METRIC_NAMESPACE,"Dimensions":[[]],"Metrics":[{"Name":n,"Unit":"Count"}]}]}, n: v, "event": n}` on stdout.
+
+---
+
+## 7. Test strategy
+
+### 7.1 Unit (vitest; AWS mocked with `aws-sdk-client-mock`; `fetch` injected)
+
+| Area | Must cover |
+|---|---|
+| config | every rule in §2.3 (one test each), defaults, `region`-only change switches partition (G3), secret-looking key rejected |
+| partition | `partitionOf/urlSuffixOf/awsConsoleHost` for ap-northeast-1, us-west-2, cn-north-1, cn-northwest-1 |
+| tokens | round-trip, expiry, tamper (each segment), cross-domain key misuse (an access token never passes as incr), malformed input never throws, client_id redirect binding |
+| oauth | well-known bodies; DCR allow/deny (loopback any port, Quick on aws only, extra host, `*.` wildcard, custom scheme rejected); authorize validation order; callback new/existing/mismatch/disabled; token code + PKCE + redirect mismatch + replay; refresh rotation + replay; wecom QR start/status/identity slot replacement (DescribeSecret fallback) |
+| middleware | 401 (both forms), 503, 400 ×3, 202 notification, no-credential tools/call envelope, tools/list forwarded without token, signed request headers (exact set, Mcp-Session-Id derived and client value ignored), 429/5xx/timeout mapping |
+| refresh | half-life skip, revoked delete, store retry → TokenLost EMF, pagination |
+| adapters (lambda) | URL building per brand, exchange/refresh field parsing (`expireIn`/`expiresIn`), non-JSON safety, revoked mapping |
+| alarm | body format per IM, SSM read |
+
+### 7.2 Synth matrix (`test/infra/matrix.test.ts`)
+
+Fixtures: 8 configs (`<im>-aws` = ap-northeast-1, `<im>-cn` = cn-northwest-1) plus one aws config
+with `edge: cloudfront, waf: true`. For each: `Template.fromStack`, write JSON to `cdk.out/matrix/`, assert:
+(a) aws-cn: no `arn:aws:` literal (regex `/arn:aws:/` on the serialized template) and no
+`amazonaws.com"` endpoint literal. (b) aws-cn: no `AWS::CloudFront::*` / `AWS::WAFv2::*`.
+(c) Runtime role trust principal = `bedrock-agentcore.amazonaws.com`. (d) the allowlist equals
+`RUNTIME_HEADERS` and every entry starts with `HDR_PREFIX`. (e) no `bedrock:InvokeModel` anywhere.
+(f) the IAM `*` allowlist (§6.2). (g) Runtime env has no API/CF/SSM references.
+Plus: `ProtocolConfiguration === 'MCP'`, `NetworkMode PUBLIC`, idle timeout, routes present,
+`/register` route throttle, refresh Lambda present iff redirect IM, ImApp secret present iff
+redirect IM, runtime role SM write iff wecom. `nag.test.ts`: AwsSolutions with no unacknowledged errors.
+
+### 7.3 Container tests (fake CLIs)
+
+`test/container/fakes/<bin>` are Node scripts (shebang, `chmod +x`). They append
+`{argv, env subset, cwd}` to `$FAKE_LOG` and print a canned response picked by `$FAKE_SCENARIO`
+or by argv. Tests start the server (`startServer({port:0, im, toolsDir, adapterDeps})`) with
+`PATH=<fakes>:$PATH` and post JSON-RPC.
+
+Cover:
+- tools/list count = tier1 + 2 for each family.
+- discover/invoke.
+- confirm gate.
+- argv construction per IM. dws `--token` comes first and is per user. Lark env token. WeCom `--json`.
+- Env isolation: no `AWS_*` reaches the CLI.
+- Error mapping for every row of §4.7 (US-U4) and 850003 → EMF line on stdout (US-D5a).
+- wecom: credential write-back only on mtime change; per-user lock serializes two concurrent calls;
+  dirs removed after the call.
+- auth flow: start → pending with URL, then exit 0 → blob saved; and 893202 → expired.
+- `/ping` healthy with no im-app secret (R2), and `HealthyBusy` during auth.
+
+`catalog.test.ts`: every tier-1 name resolves, no tier-1 tool is `unavailable`, and
+`catalog.cliVersion === versions.ts`.
+
+`dws-isolation.test.ts` (D11, runs when `DWS_REAL=1`; CI installs `dingtalk-workspace-cli@1.0.67`):
+a local mock MCP server via `DINGTALK_<PRODUCT>_MCP_URL` + `DWS_ALLOW_HTTP_ENDPOINTS=1`. Users A and
+B alternate 10 calls each through the real adapter. Assert every request carries its own user's
+token. It MUST pass before any dws version bump. WP-C picks the product id and the header to assert
+from dws source.
+
+### 7.4 E2E smoke (`scripts/e2e-smoke.ts`, G2a; no IM credentials)
+
+Input: `--stack ImMcp-<slug> --region <r>` (reads outputs via CloudFormation). Steps, each PASS/FAIL, exit ≠ 0 on any FAIL:
+1. `GET /.well-known/oauth-authorization-server` → 200, `issuer === BaseUrl`.
+2. `GET /.well-known/oauth-protected-resource/mcp` → 200, `resource === BaseUrl/mcp`.
+3. `POST /mcp` with no token → 401 and `WWW-Authenticate` contains `resource_metadata="`.
+4. `POST /register {redirect_uris:['http://127.0.0.1:33418/callback']}` → 201 with `client_id`.
+5. `GET /authorize` (PKCE, that client) → 302 to the IM host (redirect IMs), or 200 HTML containing `work.weixin.qq.com` (wecom; checks the control RPC path end to end).
+6. Mint a token (`mint-test-token` logic, userId `e2e00000000000000000000000000000`) → `initialize` → 200, then `tools/list` → names equal `<im>_` + tier1 ∪ {discover, invoke}.
+7. `tools/call` of the first tier-1 tool → tool result `isError:true` with envelope code `im_not_authorized` (redirect: from middleware, with `authorize_url`; wecom: from the container, no blob).
+8. Throttle: 40 parallel `POST /register` → at least one 429.
+
+G2b (real tenant: authorize, read, write, two-user DingTalk check) is a **manual checklist for the
+repo owner** in `docs/en/testing.md`. It is not automated.
+
+### 7.5 Deploy test plan
+
+Checked 2026-11-04: `AWS::BedrockAgentCore::Runtime` is available in **ap-northeast-1** and
+us-west-2 (AWS regional-availability API). For cn-north-1 and cn-northwest-1, Ops confirmed the CFN
+type with `describe-type`. Global = **ap-northeast-1** (profile `default`). China = **cn-northwest-1**
+first, then cn-north-1 (profile `gcr`). China needs Ops §2 bootstrap and §3 base-image mirror first
+(operator approval).
+
+Order (sequential; slug `e2e-<im>`; destroy and run the teardown checklist after each):
+P1 feishu-aws → feishu-cn → lark-aws → lark-cn. P2 dingtalk-aws → dingtalk-cn. P3 wecom-aws → wecom-cn.
+Per deploy, record: deploy time, image size (< 2048 MB), cold start of the first `initialize`, e2e
+output, and for China the HTTP status of the default `execute-api` URL without ICP (P0 item 5).
+Optional: `agentcore invoke --runtime <arn> --mcp-method tools/list` (research §2 open item).
+
+---
+
+## 8. Work packages (3 developers, parallel)
+
+Day-0 handshake (WP-A, ½ day, before the others merge): root `package.json` + lock with **all** deps,
+`tsconfig.json`, `vitest.config.ts`, `cdk.json`, `shared/contract.ts` and `shared/versions.ts`
+exactly as in §3.6/§4.9. After that, changes to `shared/*` need all three owners to approve.
+
+### WP-A — Infra, config, scripts (owner: dev A)
+
+Files: `package.json`, `tsconfig.json`, `vitest.config.ts`, `cdk.json`, `.gitignore`, `shared/**`,
+`config/deploy.example.yaml`, `infra/**`, `scripts/{secret-set-im-app,mint-test-token,e2e-smoke,users}.ts`,
+`scripts/mirror-base-image.sh`, `test/infra/**`, `test/fixtures/configs/**`.
+
+Exports: `loadConfig(path): Config`, `derive(cfg): Derived`, `ImMcpStack`, `getInfraAdapter(im)`.
+
+Consumes: `lambda/*/index.ts` entry paths with `handler` exports (WP-B), `container/` dir +
+`container/src/server.ts` entry + `container/tools/*/tier1.json` (WP-C), and `mintAccessToken` and
+`deriveKeys` from `lambda/shared/tokens.ts` (WP-B).
+
+Scripts:
+- `secret:set-im-app`: reads the config, prompts with no echo (no argv secret), validates against
+  the IM (feishu/lark app_access_token; dingtalk `POST https://api.dingtalk.com/v1.0/oauth2/accessToken {appKey, appSecret}`),
+  writes `{appId, appSecret, configured:true}`.
+- `users`: list = Scan `user#`. revoke = set `disabled`, then `DeleteSecret --force` for the user secret.
+- `mirror-base-image.sh`: Ops §3 plus the repo policy for the CDK image-publishing role. Prints the digest.
+
+Until WP-B/C land, use stub Lambda entries and a stub container (`/ping` + empty tools/list).
+
+Done when: `npm run build` and `npm run synth:matrix` are green (all §7.2 assertions), `nag.test`
+is green, `config.test` covers every §2.3 rule, `npm run e2e` passes against a live feishu-aws
+deploy, and the docs note from §2.2 is added (en + zh-CN).
+
+### WP-B — Lambdas (owner: dev B)
+
+Files: `lambda/**`, `test/lambda/**`.
+
+Exports: `handler` in `lambda/{oauth,middleware,refresh,alarm}/index.ts`; `lambda/shared/tokens.ts`
+API (§4.2); `getLambdaAdapter` (§5.1). Env contract = §6.2 (names from `shared/contract.ts`).
+
+Consumes: `shared/contract.ts`. The container's JSON-RPC behavior per §4.6 (mock it with a fake
+`fetch` in tests).
+
+Done when: every §7.1 row for tokens/oauth/middleware/refresh/alarm/lambda-adapters is green with
+coverage ≥ 85 % lines on `lambda/shared` and `lambda/oauth`, there is no `any` in exported types,
+and the E2E steps 1–8 pass on the first live deploy (paired with WP-A).
+
+### WP-C — Container (owner: dev C)
+
+Files: `container/**` (Dockerfile, build/, src/, tools/), `scripts/gen-catalog.ts`,
+`scripts/data/lark-shortcut-scopes.json`, `config/scopes/feishu.json`, `test/container/**`.
+
+Exports: `container/src/server.ts` → `startServer(opts)` (for tests) and an auto-start when it is
+the entry point. Catalog JSON schema (§5.3). The JSON-RPC contract (§4.6). Error envelope (§4.7).
+
+Consumes: `shared/contract.ts`, `shared/versions.ts`. Runtime env (§3.5).
+
+Done when:
+- `docker build --platform linux/arm64` succeeds for each IM with global args, and for at least one
+  IM with `NPM_REGISTRY=npmmirror` and no network to github.com (verify with
+  `--add-host github.com:127.0.0.1`).
+- The image is ≤ 600 MB for dingtalk.
+- All §7.3 tests are green, and `dws-isolation` is green with the real dws 1.0.67.
+- `gen:catalog` reproduces the committed catalogs byte-for-byte except `generatedAt`.
+- The tier-1 diff vs the references is listed in the PR.
+
+### Integration milestones
+
+| When | Milestone | Gate |
+|---|---|---|
+| D+1 | Day-0 handshake merged | `npm ci && npm run build` |
+| D+5 | feishu end-to-end in synth; WP-B oauth+middleware unit green; WP-C lark catalog + server green | `synth:matrix` (feishu, lark) |
+| D+8 | First live deploy feishu-aws, then feishu-cn | E2E 1–8 |
+| D+12 | dingtalk (isolation test green), then wecom | E2E all 8 combos |
+
+Code review: `/code-review` on each PR. The `aws-samples-publish` checks (leak scan, CJK scan
+outside allowed paths, docs-vs-code) run before P4.
