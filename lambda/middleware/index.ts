@@ -63,10 +63,10 @@ async function handle(event: HttpEvent): Promise<HttpResult> {
   const base = await baseUrl();
   const keys: Keys = await loadKeys();
 
-  const resourceMetadata = `${base}/.well-known/oauth-protected-resource/mcp`;
+  const resourceMetadata = `${base}/.well-known/oauth-protected-resource`;
   const tok = bearer(event);
   if (!tok) {
-    return json(401, { error: 'unauthorized' }, { 'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadata}"` });
+    return json(401, { error: 'unauthorized' }, { 'WWW-Authenticate': `Bearer realm="mcp", resource_metadata="${resourceMetadata}"` });
   }
   const v = verifyAccessToken(keys, tok);
   if (!v) {
@@ -74,7 +74,7 @@ async function handle(event: HttpEvent): Promise<HttpResult> {
     return json(
       401,
       { error: 'invalid_token' },
-      { 'WWW-Authenticate': `Bearer error="invalid_token", resource_metadata="${resourceMetadata}"` },
+      { 'WWW-Authenticate': `Bearer realm="mcp", error="invalid_token", resource_metadata="${resourceMetadata}"` },
     );
   }
   const userId = v.userId;

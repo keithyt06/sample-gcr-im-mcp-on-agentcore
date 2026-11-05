@@ -102,13 +102,13 @@ describe('well-known', () => {
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],
-      token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
-      scopes_supported: ['mcp'],
+      token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+      scopes_supported: ['mcp', 'offline_access'],
     });
   });
   it.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])('PRM at %s', async (p) => {
     const r = await handler(ev('GET', p));
-    expect(body(r)).toEqual({ resource: `${BASE}/mcp`, authorization_servers: [BASE], bearer_methods_supported: ['header'], scopes_supported: ['mcp'] });
+    expect(body(r)).toEqual({ resource: `${BASE}/mcp`, authorization_servers: [BASE], bearer_methods_supported: ['header'], scopes_supported: ['mcp', 'offline_access'] });
   });
   it('wrong method, unknown route, wecom-only route', async () => {
     expect((await handler(ev('POST', '/.well-known/oauth-authorization-server'))).statusCode).toBe(405);
@@ -422,7 +422,7 @@ describe('POST /token', () => {
     const r = await exchange(cid, code);
     expect(r.statusCode).toBe(200);
     const b = body(r);
-    expect(b).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'mcp' });
+    expect(b).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'mcp offline_access' });
     expect(String(b.refresh_token)).toMatch(/^r1\./);
     const v = verifyAccessToken(KEYS, String(b.access_token));
     expect(v?.userId).toBe(table.get('ident#feishu#ou_alice')!.userId!.S);

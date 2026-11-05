@@ -1,6 +1,7 @@
 // POST /token: authorization_code (+ PKCE S256) and rotating refresh_token grants (§4.4).
 import { formOrJson, header, json, type HttpEvent, type HttpResult } from '../shared/http';
 import { loadKeys } from '../shared/keys';
+import { SCOPES } from './well-known';
 import { hashUserId, log } from '../shared/log';
 import { redirectMatches } from '../shared/redirects';
 import { consumeCode, consumeRefresh, getUser, putRefresh, touchUser, userStatus } from '../shared/store';
@@ -17,7 +18,7 @@ async function issue(keys: Keys, userId: string, clientId: string, family: strin
   if (!stored) return err('invalid_grant', 'refresh_token family revoked');
   return json(
     200,
-    { access_token: mintAccessToken(keys, userId), token_type: 'Bearer', expires_in: ACCESS_TTL_SEC, refresh_token: refreshToken, scope: 'mcp' },
+    { access_token: mintAccessToken(keys, userId), token_type: 'Bearer', expires_in: ACCESS_TTL_SEC, refresh_token: refreshToken, scope: SCOPES.join(' ') },
     { Pragma: 'no-cache' },
   );
 }

@@ -44,14 +44,14 @@ describe('auth', () => {
   it('401 without a bearer, with resource_metadata', async () => {
     const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, '');
     expect(r.statusCode).toBe(401);
-    expect(r.headers!['WWW-Authenticate']).toBe(`Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"`);
+    expect(r.headers!['WWW-Authenticate']).toBe(`Bearer realm="mcp", resource_metadata="${BASE}/.well-known/oauth-protected-resource"`);
     expect(rt.calls).toHaveLength(0);
   });
   it('401 invalid_token for a bad / expired / incr token', async () => {
     for (const t of ['garbage', mintAccessToken(KEYS, USER_A, 10, now() - 100)]) {
       const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, t);
       expect(r.statusCode).toBe(401);
-      expect(r.headers!['WWW-Authenticate']).toBe(`Bearer error="invalid_token", resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"`);
+      expect(r.headers!['WWW-Authenticate']).toBe(`Bearer realm="mcp", error="invalid_token", resource_metadata="${BASE}/.well-known/oauth-protected-resource"`);
     }
   });
   it('503 when the root key, base url, or user secret is unavailable', async () => {
