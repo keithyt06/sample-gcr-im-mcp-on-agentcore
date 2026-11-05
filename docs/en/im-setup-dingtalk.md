@@ -12,29 +12,48 @@ Developer console: https://open-dev.dingtalk.com
 
 ## 1. Enable CLI access for the organization (admin)
 
-https://open-dev.dingtalk.com → **CLI Access Management** → **Enable** (verify in console — UI may change).
+`dws` is still in DingTalk's co-creation phase: it only works for organizations whose admin has turned it on.
 
-- This is enabled once for the whole organization.
-- Without it, tool calls return the error code `im_admin_action_required` (the message from dws mentions `cli_not_enabled` when the org is not enabled, or `user_forbidden` / `user_not_allowed` when the user is not allowed). Users may also see a prompt to **Apply Now**. The admin then gets an approval card and can approve with one click.
+Path: https://open-dev.dingtalk.com → top navigation **More** → **Basic Info** (described as "experience organization and member management") → left menu **CLI Settings** → turn on **DWS CLI Management**.
+
+![CLI Settings: DWS CLI Management switched on](../images/dingtalk/01-cli-settings.jpg)
+
+- One switch for the whole organization. **Agent Management** on the same page controls which agent channels are allowed; the defaults are fine.
+- If it is off, tool calls return the error code `im_admin_action_required` (the dws message mentions `cli_not_enabled`, or `user_forbidden` / `user_not_allowed` when the user is excluded). Users may also see **Apply Now**; the admin then gets an approval card and approves with one click.
 
 ## 2. Create an internal app
 
-Console → **App Development** → **Internal Apps** → **Create App** (verify in console — UI may change). Enter a name and description.
+Console → **App Development** → **Internal Apps** → **Create App**. Enter a name, description, and icon.
+
+The app needs no extra capability for this service. **Add App Capability** (Cool App, Mini Program, Web App, Bot) can stay empty, because users sign in through OAuth and all calls go through `dws`.
+
+![Add App Capability: no capability is required](../images/dingtalk/02-app-capabilities.jpg)
 
 ## 3. Get the Client ID (the secret comes later)
 
 App → **Credentials & Basic Info**:
-- **Client ID** (formerly **AppKey**) → config key `im.dingtalk.clientId`, written in YAML as `dingtalk: { clientId: dingxxxxxxxxxxxx }` (8–64 letters, digits, `_` or `-`).
-- **Client Secret** (formerly **AppSecret**) → never in the config file. Keep it for step 5.
+- **Client ID** (formerly **AppKey** / SuiteKey) → config key `im.dingtalk.clientId`, written in YAML as `dingtalk: { clientId: dingxxxxxxxxxxxx }` (8–64 letters, digits, `_` or `-`).
+- **Client Secret** (formerly **AppSecret** / SuiteSecret) → never in the config file. Keep it for step 5.
 
 ## 4. Permissions and publish
 
-1. App → **Permission Management**: apply for the permissions your users need (verify in console — UI may change). At minimum, enable the personal-info read permission, which the server uses to read the signed-in user's own profile and map their identity (`Contact.User.Read`; verify in console — UI may change). Add org-level permissions (contacts, calendar, docs, …) as needed. Some need admin approval.
-2. **Publish** the app version so it is available to members. Limit the visible range to the users who should use the service.
+1. App → **Permission Management**. Set the contacts scope to **All employees** (or the members who should use the service), then search and enable:
 
-Config key `im.dingtalk.scopes`: OAuth scopes requested at authorization. Default `[openid, corpid]`. `corpid` puts the token in the organization context; leave it in.
+   | Permission | Code | Required? | Why |
+   |---|---|---|---|
+   | Contacts personal info read | `Contact.User.Read` | **Required** | The server reads the signed-in user's own profile (`/v1.0/contact/users/me`) to map their identity. Without it, sign-in fails at the callback with `im_exchange_failed` |
+   | Basic permission for SNS APIs | `snsapi_base` | On by default | OAuth sign-in |
+   | Personal phone number info | `Contact.User.mobile` | Optional | Phone number in the user's own profile |
+   | Employee phone number / email info | `fieldMobile`, `fieldEmail` | Optional | Contact lookups that return phone or email |
 
-Don't guess scope names for individual tools. When a call lacks a permission, the tool result returns the error code `missing_scope` with `required_scopes` and an `authorize_url`. Add the permission in the console, then the user opens the link.
+   The example below shows several of these enabled; all of them need no approval:
+
+   ![Permission Management: enabled permissions](../images/dingtalk/03-permissions.jpg)
+
+   Add more (contacts, calendar, docs, ...) as needed. Some require admin approval. You don't need to map every tool to a permission up front: when a call lacks one, the tool result returns `missing_scope` with `required_scopes` and an `authorize_url`.
+2. **Version Management & Release** → create and publish a version. The banner "changes take effect after the version is published" disappears once it is live. Limit the visible range to the users who should use the service.
+
+Config key `im.dingtalk.scopes`: OAuth scopes requested at authorization. Default `[openid, corpid]`, the same as the official `dws` CLI. `corpid` puts the token in the organization context; leave it in.
 
 ## 5. After deploy: store the Client Secret
 
@@ -66,13 +85,14 @@ Give users the stack output `McpUrl` (= `<base>/mcp`).
 | OAuth scopes | `im.dingtalk.scopes` (default `openid`, `corpid`) |
 | Client Secret (AppSecret) | After deploy: `npm run secret:set-im-app` → `<slug>/im-app` `{appId: <Client ID>, appSecret, configured: true}` |
 | Redirect URL | Stack output `CallbackUrl` → DingTalk console → Security Settings |
-| CLI access | DingTalk developer platform → CLI Access Management (admin) |
+| CLI access | Developer platform → More → Basic Info → CLI Settings (admin) |
 
 ## Common errors
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Tool result `im_admin_action_required`, message mentions `cli_not_enabled` | Org has not enabled CLI access | Step 1 (admin) |
+| Sign-in fails right after DingTalk consent; `oauth` Lambda log shows `im_exchange_failed` with `users_me` | `Contact.User.Read` is not enabled, or the version with it is not published | Step 4, then publish |
+| Tool result `im_admin_action_required`, message mentions `cli_not_enabled` | Org has not enabled CLI access | Step 1 (admin): More → Basic Info → CLI Settings |
 | Tool result `im_admin_action_required`, message mentions `user_forbidden` | User is not allowed by the org's CLI access policy | Admin approves the user's request or widens the policy |
 | Authorization page error about redirect URI | `CallbackUrl` not registered, or a different host (custom domain vs API Gateway URL) | Step 6. Register the exact URL you deployed with |
 | Tool result `missing_scope` | App lacks that permission, or the user hasn't granted it | Add the permission (step 4), publish if required, user opens `authorize_url` |
