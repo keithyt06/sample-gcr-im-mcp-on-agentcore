@@ -13,15 +13,23 @@
 1. 用租户内有权限创建应用的账号登录开发者后台。
 2. 点击**创建企业自建应用**，填写名称、描述和图标，点击**创建**。
 
+![创建企业自建应用：填写名称、描述和图标](../images/feishu/01-create-custom-app.jpg)
+
 ## 2. 获取 App ID（密钥稍后再填）
 
 应用 → **凭证与基础信息**：
 - **App ID**（`cli_` 加 8–32 位字母数字）→ 配置项 `im.feishu.appId`，YAML 中写作 `feishu: { appId: cli_xxxxxxxxxxxxxxxx }`。
 - **App Secret** → **不要**写进配置文件，留到第 6 步使用。
 
+应用创建成功后，页面会直接显示这两个值，请妥善保存：
+
+![创建成功：App ID 与 App Secret](../images/feishu/02-app-credentials.jpg)
+
 ## 3. 开通权限
 
 应用 → **权限管理** → **批量导入/导出**（以控制台为准，界面可能变化）→ 粘贴 scope JSON。
+
+![批量导入权限：粘贴 config/scopes/feishu.json 的内容](../images/feishu/03-bulk-import-scopes.jpg)
 
 - 使用仓库中生成好的列表 [`config/scopes/feishu.json`](../../config/scopes/feishu.json)。格式为 `{"scopes": {"tenant": [], "user": [...]}}`，覆盖 tier-1 工具和 `offline_access`。它由 `npm run gen:catalog` 根据固定版本的 `lark-cli` 生成，与服务端实际提供的工具保持一致，可以直接粘贴到批量导入中。
 - 本项目**只使用用户身份**，所有 scope 都在 `user` 下，`tenant` 留空。
@@ -35,9 +43,17 @@
 
 应用 → **可用范围**：限定为需要使用本服务的部门或成员。**只有可用范围内的成员才能完成授权。**决定谁能接入的是可用范围，而不是任何密钥。
 
+可用范围在创建版本（第 5 步）时设置，可选**全部成员**或**部分成员**：
+
+![可用范围设置：全部成员或部分成员](../images/feishu/04-availability-scope.jpg)
+
 ## 5. 发布版本
 
 应用 → **版本管理与发布** → 创建版本 → 提交，由租户管理员审批。**之后每次修改权限都要重新发布版本。**
+
+如果本次发布免审（例如个人版或测试租户），确认后即自动上线：
+
+![确认提交发布申请](../images/feishu/05-publish-version.jpg)
 
 ## 6. 部署后：写入 App Secret
 

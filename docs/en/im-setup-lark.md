@@ -8,6 +8,8 @@ Do steps 1–5 **before** deploying and steps 6–7 **after** the first deploy.
 
 Developer console: https://open.larksuite.com/app
 
+> The Lark developer console has the same layout as Feishu (English labels). For screenshots of each step, see the [Feishu guide](im-setup-feishu.md).
+
 ## 1. Create a custom app
 
 Sign in to the developer console → **Create Custom App** → enter a name, description, and icon → **Create**.

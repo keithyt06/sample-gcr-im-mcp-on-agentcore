@@ -8,6 +8,8 @@ Lark（国际版，open.larksuite.com）与飞书（国内版，open.feishu.cn�
 
 开发者后台：https://open.larksuite.com/app
 
+> Lark 开发者后台的页面布局与飞书相同（界面为英文）。各步骤截图请参考[飞书配置指南](im-setup-feishu.md)。
+
 ## 1. 创建自建应用
 
 登录开发者后台 → **Create Custom App** → 填写名称、描述和图标 → **Create**。

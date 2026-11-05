@@ -13,15 +13,23 @@ Developer console: https://open.feishu.cn/app
 1. Sign in to the developer console with an account that is allowed to create apps in your tenant.
 2. Choose **Create Custom App**. Enter a name, description, and icon, then click **Create**.
 
+![Create a custom app: name, description and icon](../images/feishu/01-create-custom-app.jpg)
+
 ## 2. Get the App ID (the secret comes later)
 
 App → **Credentials & Basic Info**:
 - **App ID** (looks like `cli_` followed by 8–32 letters and digits) → config key `im.feishu.appId`, written in YAML as `feishu: { appId: cli_xxxxxxxxxxxxxxxx }`.
 - **App Secret** → do **not** put it in the config. Keep it at hand for step 6.
 
+The console shows both values right after the app is created. Copy them somewhere safe:
+
+![App created: App ID and App Secret](../images/feishu/02-app-credentials.jpg)
+
 ## 3. Enable permission scopes
 
 App → **Permissions & Scopes** → **Import/Export** (verify in console — UI may change) → paste the scope JSON.
+
+![Bulk import scopes: paste the JSON from config/scopes/feishu.json](../images/feishu/03-bulk-import-scopes.jpg)
 
 - Use the generated list in [`config/scopes/feishu.json`](../../config/scopes/feishu.json). It has the shape `{"scopes": {"tenant": [], "user": [...]}}` and covers the tier-1 tools plus `offline_access`. It is produced by `npm run gen:catalog` from the pinned `lark-cli`, so it stays in step with the tools the server exposes. You can paste it into the bulk import as is.
 - This project uses **user identity only**. All scopes are under `user`, and `tenant` stays empty.
@@ -35,9 +43,17 @@ Config key `im.feishu.scopes`: the scopes requested at authorization. **Default 
 
 App → **Availability**: limit it to the departments or members who should use the service. **Only members in scope can authorize.** This, not any secret, decides who can connect.
 
+You set availability while creating the version (step 5): **All members** or **Some members**.
+
+![Availability: all members or selected members](../images/feishu/04-availability-scope.jpg)
+
 ## 5. Publish a version
 
 App → **Version Management & Release** → create a version → submit. The tenant admin approves it. **Every later scope change needs a new published version.**
+
+If the release is exempt from review (for example, in a personal or test tenant), it goes live as soon as you confirm:
+
+![Submit the version for release](../images/feishu/05-publish-version.jpg)
 
 ## 6. After deploy: store the App Secret
 
