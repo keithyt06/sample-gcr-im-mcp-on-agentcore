@@ -48,6 +48,16 @@ describe('feishu / lark', () => {
     expect(f.calls.filter((c) => c.url.includes('app_access_token'))).toHaveLength(1);
   });
 
+  it('open_id missing from the token response → taken from user_info (current Feishu behavior)', async () => {
+    const f = fakeFetch([
+      ['app_access_token', () => jsonResp(200, { code: 0, app_access_token: 'apt' })],
+      ['oidc/access_token', () => jsonResp(200, { code: 0, data: { access_token: 'at', refresh_token: 'rt', expires_in: 7200 } })],
+      ['user_info', () => jsonResp(200, { code: 0, data: { name: 'Keith', open_id: 'ou_from_userinfo' } })],
+    ]);
+    const r = await feishu(f).exchangeCode({ code: 'c', callbackUrl: 'x', app });
+    expect(r.identity).toEqual({ imUid: 'ou_from_userinfo', displayName: 'Keith' });
+  });
+
   it('display name failures are ignored', async () => {
     for (const ui of [() => jsonResp(200, { code: 1 }), () => { throw new Error('net'); }]) {
       const f = fakeFetch([

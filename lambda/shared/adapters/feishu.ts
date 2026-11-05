@@ -59,16 +59,17 @@ export function createFeishuAdapter(brand: 'feishu' | 'lark', d?: AdapterDeps): 
     return { accessToken, refreshToken: str(data.refresh_token), expiresAt: issuedAt + expiresIn, issuedAt, scope: str(data.scope) };
   }
 
-  async function displayName(accessToken: string): Promise<string | undefined> {
+  /** `/authen/v1/user_info`: open_id + name. The OIDC token response no longer always carries open_id. */
+  async function userInfo(accessToken: string): Promise<{ openId?: string; name?: string }> {
     try {
       const r = await fetchJson(deps, 'user_info', `https://${host.open}/open-apis/authen/v1/user_info`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = r.body?.data as Record<string, unknown> | undefined;
-      return r.body?.code === 0 ? str(data?.name) : undefined;
+      return r.body?.code === 0 ? { openId: str(data?.open_id), name: str(data?.name) } : {};
     } catch {
-      return undefined;
+      return {};
     }
   }
 
@@ -90,9 +91,10 @@ export function createFeishuAdapter(brand: 'feishu' | 'lark', d?: AdapterDeps): 
       const data = r.body?.data as Record<string, unknown> | undefined;
       if (r.body?.code !== 0 || !data) throw new ImUpstreamError('oidc_access_token', `code=${String(r.body?.code ?? r.status)}`);
       const tokens = toTokens(data, 'oidc_access_token');
-      const imUid = str(data.open_id);
-      if (!imUid) throw new ImUpstreamError('oidc_access_token', 'missing open_id');
-      return { tokens, identity: { imUid, displayName: await displayName(tokens.accessToken) } };
+      const info = await userInfo(tokens.accessToken);
+      const imUid = str(data.open_id) ?? info.openId;
+      if (!imUid) throw new ImUpstreamError('oidc_access_token', 'missing open_id (token response and user_info)');
+      return { tokens, identity: { imUid, displayName: info.name } };
     },
     async refresh({ refreshToken, app }): Promise<RefreshResult> {
       let appToken: string;
