@@ -52,6 +52,11 @@ Stack 输出 `CallbackUrl`（= `<base>/callback`）。`ImConsoleCallbackHint` �
 
 把 Stack 输出 `McpUrl`（= `<base>/mcp`）发给用户。
 
+## 7. 接入客户端
+
+- **Amazon Quick**（AWS Global）：见 [client-amazon-quick.md](client-amazon-quick.md)，选择 **Default OAuth app**。只有第 4 步的登录页是钉钉的。
+- **Kiro / Claude Code / Codex / Cursor**：见 [README](../../README.zh-CN.md#连接-mcp-客户端)。
+
 ## 配置与密钥对照
 
 | 值 | 位置 |

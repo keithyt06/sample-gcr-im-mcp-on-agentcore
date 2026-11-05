@@ -52,6 +52,11 @@ App → **Security Settings** → **Redirect URL** (labelled "callback domain" i
 
 Give users the stack output `McpUrl` (= `<base>/mcp`).
 
+## 7. Connect a client
+
+- **Amazon Quick** (AWS Global): [client-amazon-quick.md](client-amazon-quick.md), with **Default OAuth app**. Only the sign-in page in step 4 is DingTalk's.
+- **Kiro / Claude Code / Codex / Cursor**: see the [README](../../README.md#connect-an-mcp-client).
+
 ## Config and secret mapping
 
 | Value | Where |

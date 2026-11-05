@@ -113,7 +113,7 @@ agentcore runtime invoke --id <runtime-id> \
 | C8 | `npm run users -- list` | A 和 B 都显示为 `active` |
 | C9 | `npm run users -- revoke <A>` | 60 秒内 A 的工具调用失败；A 的 refresh 失败；1 小时内 A 现有的 access token 失效；A 重新授权被拒绝。B 不受影响 |
 | C10 | 客户端闲置超过 1 小时后调用工具 | 客户端静默刷新 MCP token |
-| C11 | 仅 Global：连接 Amazon Quick | 授权成功并列出工具 |
+| C11 | 仅 Global：用 **Default OAuth app** 连接 Amazon Quick（[教程](client-amazon-quick.md)） | 授权成功并列出工具（已用飞书在 ap-southeast-1 验证） |
 | C12 | 中国区使用已备案的自定义域名：通过自定义域名重复 C1–C4 | 结果相同 |
 
 ### 飞书 / Lark

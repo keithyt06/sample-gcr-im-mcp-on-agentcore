@@ -47,6 +47,8 @@ wecom:
 
 企业微信这边不需要登记回调 URL。
 
+**Amazon Quick**（AWS Global）：按 [client-amazon-quick.md](client-amazon-quick.md) 操作，选择 **Default OAuth app**；第 4 步 Quick 打开的是企业微信扫码页，而不是 OAuth 授权页。
+
 ## 每 7 天续期一次能力授权（已接受的限制）
 
 每项能力授权在授予后 **7 天**过期，之后调用会返回企业微信错误码 **850003**。没有接口可以自动续期，必须由用户**在企业微信客户端中手动续期**：

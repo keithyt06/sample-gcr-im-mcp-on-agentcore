@@ -11,6 +11,18 @@ One codebase, one config file, and one CDK app deploy a per-user MCP server for 
 > **AWS China regions (`cn-north-1`, `cn-northwest-1`): public access requires an ICP filing and a custom domain.**
 > Without an ICP-filed domain, every request from the internet to the default API Gateway URL returns `403 Forbidden`. The stack still deploys and the backend works (verify with `npm run e2e:internal`), but MCP clients cannot reach it. Set `ingress.customDomain` to an ICP-filed domain and `ingress.certificateArn` to an ACM certificate in the same region. Amazon Quick is not available in AWS China; use Kiro, Claude Code, Codex, or Cursor.
 
+## Documentation
+
+| I want to… | Read |
+|---|---|
+| See what I must prepare before deploying | [Prerequisites](docs/en/prerequisites.md) |
+| Create and configure the IM app | [Feishu](docs/en/im-setup-feishu.md) (with screenshots) · [Lark](docs/en/im-setup-lark.md) · [DingTalk](docs/en/im-setup-dingtalk.md) · [WeCom](docs/en/im-setup-wecom.md) |
+| Deploy to AWS Global or AWS China | [Deploy guide](docs/en/deploy.md) |
+| **Connect Amazon Quick** (Default OAuth app, step by step with screenshots) | [Amazon Quick connector tutorial](docs/en/client-amazon-quick.md) |
+| Connect Kiro, Claude Code, Codex, or Cursor | [Connect an MCP client](#connect-an-mcp-client) |
+| Test the deployment | [Testing](docs/en/testing.md) |
+| Understand the security model | [Security](docs/en/security.md) |
+
 ## What you get
 
 - **One IM per deployment**, selected by `im:` in `config/deploy.yaml`. The partition (`aws` or `aws-cn`) is derived from `region`; nothing else changes between Global and China.
@@ -58,12 +70,12 @@ MCP client --HTTPS--> API Gateway --> oauth Lambda      (sign-in, tokens)
 
 ## Supported matrix
 
-| IM | Auth mode | AWS Global | AWS China | Tested (infra level, no real IM tenant) |
-|---|---|---|---|---|
-| Feishu (`feishu`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China cn-northwest-1: `e2e:internal` 7/7 (public URL 403 without ICP, as expected) |
-| Lark (`lark`) | OAuth redirect | Yes | Yes (cross-border traffic to Lark) | Synth matrix only |
-| DingTalk (`dingtalk`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only |
-| WeCom (`wecom`) | QR scan in the container | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only |
+| IM | Auth mode | AWS Global | AWS China | Tested | Setup guide |
+|---|---|---|---|---|---|
+| Feishu (`feishu`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global: `e2e` 8/8 (ap-northeast-1, ap-southeast-1); **real Feishu tenant + Amazon Quick end to end** (ap-southeast-1). China cn-northwest-1: `e2e:internal` 7/7 (public URL 403 without ICP, as expected) | [Feishu](docs/en/im-setup-feishu.md) |
+| Lark (`lark`) | OAuth redirect | Yes | Yes (cross-border traffic to Lark) | Synth matrix only | [Lark](docs/en/im-setup-lark.md) |
+| DingTalk (`dingtalk`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only | [DingTalk](docs/en/im-setup-dingtalk.md) |
+| WeCom (`wecom`) | QR scan in the container | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only | [WeCom](docs/en/im-setup-wecom.md) |
 
 All 4 IMs × 2 partitions are covered by the synth-matrix unit tests. Real-tenant tests are a manual checklist in [docs/en/testing.md](docs/en/testing.md#3-real-tenant-manual-checklist-g2b). Supported regions: `infra/lib/regions.ts`.
 
@@ -153,7 +165,7 @@ Then run `codex mcp login feishu` to authenticate.
 
 **Cursor** and other clients that support remote MCP servers with OAuth: add the same URL as a streamable HTTP server.
 
-**Amazon Quick (AWS Global only)**: add an MCP integration with the server URL `https://<your-base>/mcp` and OAuth with dynamic client registration (verify in console — UI may change). The Quick callback hosts are allowed automatically in AWS Global regions. If the Quick form requires Client ID / Client secret / Token URL / Authorization URL, run `npm run register-client` and paste its output. Step-by-step: [docs/en/client-amazon-quick.md](docs/en/client-amazon-quick.md).
+**Amazon Quick (AWS Global only)**: create an MCP connector with the `McpUrl` and set **Auth configuration** to **Default OAuth app**. Quick registers itself, so there is no Client ID to enter. Each user then signs in with their own IM account. Follow the [Amazon Quick connector tutorial](docs/en/client-amazon-quick.md), which has a screenshot of every step.
 
 Use the IM name you deployed (`feishu`, `lark`, `dingtalk`, `wecom`) as the server name. Tool names are prefixed with it, for example `feishu_im_messages_send`, `dingtalk_calendar_event_list`, `wecom_doc_search`.
 

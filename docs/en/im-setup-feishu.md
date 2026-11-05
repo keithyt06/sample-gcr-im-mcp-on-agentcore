@@ -69,10 +69,17 @@ The deploy prints the stack output `CallbackUrl` (= `<base>/callback`) and `ImCo
 
 App → **Security Settings** → **Redirect URLs** → paste `CallbackUrl` → **Add**.
 
+![Security Settings → Redirect URLs with the CallbackUrl](../images/feishu/06-redirect-url.jpg)
+
 - Register the full path. Query strings (`?…`) and fragments (`#…`) don't need to be included.
 - If you later add or change `ingress.customDomain` or `ingress.edge`, register the new callback URL too.
 
 Then give users the MCP endpoint, stack output `McpUrl` (= `<base>/mcp`).
+
+## 8. Connect a client
+
+- **Amazon Quick** (AWS Global): [client-amazon-quick.md](client-amazon-quick.md). Choose **Default OAuth app**; no Client ID is needed. Every Quick screen is shown with Feishu.
+- **Kiro / Claude Code / Codex / Cursor**: add the `McpUrl`, as shown in the [README](../../README.md#connect-an-mcp-client).
 
 ## Config and secret mapping
 

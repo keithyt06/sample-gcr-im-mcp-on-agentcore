@@ -69,10 +69,17 @@ npm run secret:set-im-app -- -c config=config/deploy.yaml
 
 应用 → **安全设置** → **重定向 URL** → 粘贴 `CallbackUrl` → **添加**。
 
+![安全设置 → 重定向 URL：粘贴 CallbackUrl](../images/feishu/06-redirect-url.jpg)
+
 - 填写完整路径，查询参数（`?…`）和锚点（`#…`）不用填。
 - 之后如果新增或更改了 `ingress.customDomain` 或 `ingress.edge`，也要登记新的回调 URL。
 
 然后把 MCP 端点，即 Stack 输出 `McpUrl`（= `<base>/mcp`），发给用户。
+
+## 8. 接入客户端
+
+- **Amazon Quick**（AWS Global）：见 [client-amazon-quick.md](client-amazon-quick.md)。选择 **Default OAuth app**，不需要 Client ID。每个 Quick 界面都有飞书示例截图。
+- **Kiro / Claude Code / Codex / Cursor**：添加 `McpUrl`，见 [README](../../README.zh-CN.md#连接-mcp-客户端)。
 
 ## 配置与密钥对照
 

@@ -113,7 +113,7 @@ The repo owner runs this with a real IM app and at least **two real users (A and
 | C8 | `npm run users -- list` | A and B listed as `active` |
 | C9 | `npm run users -- revoke <A>` | Within 60 s A's tool calls fail; A's refresh fails; within 1 hour A's existing access token stops working; re-authorizing as A is refused. B is unaffected |
 | C10 | Leave the client idle over 1 hour, then call a tool | The client refreshes its MCP token silently |
-| C11 | Global only: connect Amazon Quick | Authorizes and lists tools |
+| C11 | Global only: connect Amazon Quick with **Default OAuth app** ([tutorial](client-amazon-quick.md)) | Authorizes and lists tools (verified with Feishu, ap-southeast-1) |
 | C12 | China with ICP-filed custom domain: repeat C1–C4 via the custom domain | Same results |
 
 ### Feishu / Lark

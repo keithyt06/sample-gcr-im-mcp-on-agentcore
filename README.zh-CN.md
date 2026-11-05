@@ -11,6 +11,18 @@
 > **AWS 中国区（`cn-north-1`、`cn-northwest-1`）：公网访问必须有 ICP 备案和自定义域名。**
 > 没有已备案的域名时，从公网访问默认 API Gateway URL 的所有请求都返回 `403 Forbidden`。Stack 仍可正常部署，后端也能工作（可用 `npm run e2e:internal` 验证），但 MCP 客户端无法访问。请把 `ingress.customDomain` 设为已完成 ICP 备案的域名，把 `ingress.certificateArn` 设为同一区域 ACM 中的证书。AWS 中国区没有 Amazon Quick，请使用 Kiro、Claude Code、Codex 或 Cursor。
 
+## 文档导航
+
+| 我想要… | 阅读 |
+|---|---|
+| 了解部署前要准备什么 | [部署前提](docs/zh-CN/prerequisites.md) |
+| 创建并配置 IM 应用 | [飞书](docs/zh-CN/im-setup-feishu.md)（含截图）· [Lark](docs/zh-CN/im-setup-lark.md) · [钉钉](docs/zh-CN/im-setup-dingtalk.md) · [企业微信](docs/zh-CN/im-setup-wecom.md) |
+| 部署到 AWS Global 或 AWS 中国区 | [部署指南](docs/zh-CN/deploy.md) |
+| **接入 Amazon Quick**（Default OAuth app，带截图的分步教程） | [Amazon Quick connector 教程](docs/zh-CN/client-amazon-quick.md) |
+| 接入 Kiro、Claude Code、Codex 或 Cursor | [连接 MCP 客户端](#连接-mcp-客户端) |
+| 测试部署 | [测试](docs/zh-CN/testing.md) |
+| 了解安全模型 | [安全](docs/zh-CN/security.md) |
+
 ## 功能概览
 
 - **每个部署一个 IM**，由 `config/deploy.yaml` 中的 `im:` 选择。分区（`aws` 或 `aws-cn`）由 `region` 推导，Global 与中国区之间没有其他差异。
@@ -58,12 +70,12 @@ MCP 客户端 --HTTPS--> API Gateway --> oauth Lambda      （登录、token）
 
 ## 支持矩阵
 
-| IM | 授权方式 | AWS Global | AWS 中国区 | 测试情况（基础设施层面，未使用真实 IM 租户） |
-|---|---|---|---|---|
-| 飞书（`feishu`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区 cn-northwest-1：`e2e:internal` 7/7（无 ICP 时公网 URL 返回 403，符合预期） |
-| Lark（`lark`） | OAuth 跳转 | 支持 | 支持（访问 Lark 需跨境） | 仅 synth 矩阵 |
-| 钉钉（`dingtalk`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 |
-| 企业微信（`wecom`） | 容器内扫码 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 |
+| IM | 授权方式 | AWS Global | AWS 中国区 | 测试情况 | 配置指南 |
+|---|---|---|---|---|---|
+| 飞书（`feishu`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global：`e2e` 8/8（ap-northeast-1、ap-southeast-1）；**真实飞书租户 + Amazon Quick 端到端已跑通**（ap-southeast-1）。中国区 cn-northwest-1：`e2e:internal` 7/7（无 ICP 时公网 URL 返回 403，符合预期） | [飞书](docs/zh-CN/im-setup-feishu.md) |
+| Lark（`lark`） | OAuth 跳转 | 支持 | 支持（访问 Lark 需跨境） | 仅 synth 矩阵 | [Lark](docs/zh-CN/im-setup-lark.md) |
+| 钉钉（`dingtalk`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 | [钉钉](docs/zh-CN/im-setup-dingtalk.md) |
+| 企业微信（`wecom`） | 容器内扫码 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 | [企业微信](docs/zh-CN/im-setup-wecom.md) |
 
 4 个 IM × 2 个分区全部由 synth 矩阵单元测试覆盖。真实租户测试是 [docs/zh-CN/testing.md](docs/zh-CN/testing.md#3-真实租户手工检查清单g2b) 中的手工检查清单。受支持区域见 `infra/lib/regions.ts`。
 
@@ -153,7 +165,7 @@ url = "https://<your-base>/mcp"
 
 **Cursor** 以及其他支持带 OAuth 的远程 MCP 服务器的客户端：把同一个 URL 添加为 streamable HTTP 服务器。
 
-**Amazon Quick（仅 AWS Global）**：添加 MCP 集成，服务器 URL 填 `https://<your-base>/mcp`，认证方式选择支持动态客户端注册的 OAuth（以控制台为准，界面可能变化）。在 AWS Global 区域，Quick 的回调主机会被自动允许。如果 Quick 表单要求填写 Client ID / Client secret / Token URL / Authorization URL，执行 `npm run register-client` 并粘贴输出。详细步骤见 [docs/zh-CN/client-amazon-quick.md](docs/zh-CN/client-amazon-quick.md)。
+**Amazon Quick（仅 AWS Global）**：用 `McpUrl` 创建一个 MCP connector，把 **Auth configuration** 设为 **Default OAuth app**。Quick 会自动注册，不需要填写 Client ID；之后每个用户用自己的 IM 账号登录。完整步骤见 [Amazon Quick connector 教程](docs/zh-CN/client-amazon-quick.md)，每一步都有截图。
 
 服务器名称请使用你部署的 IM 名（`feishu`、`lark`、`dingtalk`、`wecom`）。工具名以它为前缀，例如 `feishu_im_messages_send`、`dingtalk_calendar_event_list`、`wecom_doc_search`。
 

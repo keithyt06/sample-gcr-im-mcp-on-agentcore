@@ -31,7 +31,7 @@
 | 21 | **管理员审批** | feishu / lark：发布应用版本并审批通过。dingtalk：发布应用，并为组织**开通 CLI 访问**。wecom：用户（以及限制机器人的组织的管理员）同意智能机器人的能力授权 | IM 管理后台（见各 IM 配置指南） | 在 IM 后台完成，无需保存 |
 | 22 | **重定向（回调）URL 登记**（**部署后**） | feishu / lark / dingtalk | Stack 输出 `CallbackUrl`（= `<base>/callback`）。飞书/Lark 还会输出 `ImConsoleCallbackHint`，是直达后台对应页面的链接 | 粘贴到 IM 后台（飞书/Lark：安全设置 → 重定向 URL；钉钉：见指南） |
 | 23 | 告警 webhook URL（可选） | all | IM 群机器人 webhook（或任意 HTTPS 端点） | 先自行把 URL 存入一个 **SSM 参数**，配置项 `alarm.webhookUrlSsmParam` 只填**参数名** |
-| 24 | MCP 客户端 | all | Global：Amazon Quick、Kiro、Claude Code、Codex、Cursor。中国区：Kiro、Claude Code、Codex、Cursor（AWS 中国区没有 Amazon Quick） | 终端用户只需要 `<base>/mcp`（Stack 输出 `McpUrl`） |
+| 24 | MCP 客户端 | all | Global：Amazon Quick、Kiro、Claude Code、Codex、Cursor。中国区：Kiro、Claude Code、Codex、Cursor（AWS 中国区没有 Amazon Quick） | 终端用户只需要 `<base>/mcp`（Stack 输出 `McpUrl`）。Amazon Quick：见[教程](client-amazon-quick.md) |
 
 **`<base>`** 是服务的公网基础 URL，即 Stack 输出 `BaseUrl`。设置了自定义域名时为 `https://<ingress.customDomain>`；`ingress.edge: cloudfront` 时为 CloudFront 域名；否则为 API Gateway 的 `execute-api` URL。其他输出：`McpUrl`；`CallbackUrl`、`ImAppSecretName` 和 `ImConsoleCallbackHint`（feishu/lark/dingtalk）；`CustomDomainTarget`（仅自定义域名）；`RuntimeArn`、`AlarmTopicArn`、`RootKeySecretName`、`UserSecretPrefix`、`TableName`。
 

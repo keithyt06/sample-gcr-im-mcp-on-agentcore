@@ -47,6 +47,8 @@ Pending users never receive an MCP access token. A user who re-authorizes later 
 
 There is no callback URL to register with WeCom.
 
+**Amazon Quick** (AWS Global): follow [client-amazon-quick.md](client-amazon-quick.md) with **Default OAuth app**; in step 4 Quick opens the WeCom QR page instead of an OAuth consent page.
+
 ## Renewing capability grants every 7 days (ACCEPTED limitation)
 
 Each capability grant expires **7 days** after it is given. After that, calls fail with WeCom error **850003**. There is no API to renew it; the user must renew it **manually in the WeCom client**:
