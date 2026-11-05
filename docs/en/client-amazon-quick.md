@@ -6,7 +6,7 @@ Amazon Quick connects to this server with **Default OAuth app**: Quick discovers
 
 Amazon Quick is not available in AWS China. In China, use Kiro, Claude Code, Codex, or Cursor ([README](../../README.md#connect-an-mcp-client)).
 
-The screenshots use Feishu. Lark, DingTalk and WeCom work the same way; only the sign-in page in step 4 differs.
+The screenshots use Feishu. Lark, DingTalk and WeCom work the same way; only the sign-in page in step 4 differs. DingTalk has its own walkthrough with DingTalk screenshots: [quick-walkthrough-dingtalk.md](quick-walkthrough-dingtalk.md).
 
 ## Before you start
 

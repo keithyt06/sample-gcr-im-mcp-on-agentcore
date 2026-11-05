@@ -51,7 +51,9 @@
    ![权限管理：已开通的权限](../images/dingtalk/03-permissions.jpg)
 
    通讯录、日程、文档等权限按需添加，其中部分需要管理员审批。不必事先把每个工具都对应到权限：调用缺少权限时，工具结果会返回 `missing_scope`，附带 `required_scopes` 和 `authorize_url`。
-2. **版本管理与发布** → 创建并发布版本。上线后，"版本发布后，当前修改才能生效"的提示会消失。把可见范围限定为需要使用本服务的用户。
+2. **版本管理与发布** → 创建版本：填写应用版本号（例如 `1.0.0`）、版本描述，并设置**应用可用范围**（全部员工、部分员工、仅限管理员或仅我可见），保存后发布。发布之前，"版本发布后，当前修改才能生效"的提示会一直存在，新开通的权限和重定向 URL 都不会生效。
+
+   ![版本详情：版本号、版本描述、应用可用范围](../images/dingtalk/05-publish-version.jpg)
 
 配置项 `im.dingtalk.scopes`：授权时申请的 OAuth scope，默认 `[openid, corpid]`，与官方 `dws` CLI 一致。`corpid` 让 token 带上组织上下文，请保留。
 
@@ -67,13 +69,17 @@ npm run secret:set-im-app -- -c config=config/deploy.yaml
 
 Stack 输出 `CallbackUrl`（= `<base>/callback`）。`ImConsoleCallbackHint` 是钉钉应用列表的链接。
 
-应用 → **安全设置** → **重定向 URL**（部分控制台版本叫"回调域名"）→ 添加 `CallbackUrl` → 保存（以控制台为准，界面可能变化）。
+应用 → **安全设置** → **重定向URL（回调域名）** → 粘贴 `CallbackUrl` → **保存**。IP 白名单留空即可：服务运行在 AgentCore Runtime 上，没有固定的出口 IP。
+
+![安全设置：重定向URL（回调域名）填写 CallbackUrl](../images/dingtalk/04-redirect-url.jpg)
+
+修改本页或权限管理后，需要重新发布版本（第 4 步第 2 点）。
 
 把 Stack 输出 `McpUrl`（= `<base>/mcp`）发给用户。
 
 ## 7. 接入客户端
 
-- **Amazon Quick**（AWS Global）：见 [client-amazon-quick.md](client-amazon-quick.md)，选择 **Default OAuth app**。只有第 4 步的登录页是钉钉的。
+- **Amazon Quick**（AWS Global）：按 [Amazon Quick 接入钉钉实操](quick-walkthrough-dingtalk.md)（每一步都有钉钉截图）或通用的 [Amazon Quick 教程](client-amazon-quick.md) 操作。**Auth configuration** 选择 **Default OAuth app**，不需要 Client ID。
 - **Kiro / Claude Code / Codex / Cursor**：见 [README](../../README.zh-CN.md#连接-mcp-客户端)。
 
 ## 配置与密钥对照

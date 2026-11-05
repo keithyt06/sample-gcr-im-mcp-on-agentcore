@@ -16,9 +16,9 @@ One codebase, one config file, and one CDK app deploy a per-user MCP server for 
 | I want to… | Read |
 |---|---|
 | See what I must prepare before deploying | [Prerequisites](docs/en/prerequisites.md) |
-| Create and configure the IM app | [Feishu](docs/en/im-setup-feishu.md) (with screenshots) · [Lark](docs/en/im-setup-lark.md) · [DingTalk](docs/en/im-setup-dingtalk.md) · [WeCom](docs/en/im-setup-wecom.md) |
+| Create and configure the IM app | [Feishu](docs/en/im-setup-feishu.md) (with screenshots) · [Lark](docs/en/im-setup-lark.md) · [DingTalk](docs/en/im-setup-dingtalk.md) (with screenshots) · [WeCom](docs/en/im-setup-wecom.md) |
 | Deploy to AWS Global or AWS China | [Deploy guide](docs/en/deploy.md) |
-| **Connect Amazon Quick** (Default OAuth app, step by step with screenshots) | [Amazon Quick connector tutorial](docs/en/client-amazon-quick.md) |
+| **Connect Amazon Quick** (Default OAuth app, step by step with screenshots) | [Amazon Quick connector tutorial](docs/en/client-amazon-quick.md) (Feishu screenshots) · [DingTalk walkthrough](docs/en/quick-walkthrough-dingtalk.md) |
 | Connect Kiro, Claude Code, Codex, or Cursor | [Connect an MCP client](#connect-an-mcp-client) |
 | Test the deployment | [Testing](docs/en/testing.md) |
 | Understand the security model | [Security](docs/en/security.md) |
@@ -74,7 +74,7 @@ MCP client --HTTPS--> API Gateway --> oauth Lambda      (sign-in, tokens)
 |---|---|---|---|---|---|
 | Feishu (`feishu`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global: `e2e` 8/8 (ap-northeast-1, ap-southeast-1); **real Feishu tenant + Amazon Quick end to end** (ap-southeast-1). China cn-northwest-1: `e2e:internal` 7/7 (public URL 403 without ICP, as expected) | [Feishu](docs/en/im-setup-feishu.md) |
 | Lark (`lark`) | OAuth redirect | Yes | Yes (cross-border traffic to Lark) | Synth matrix only | [Lark](docs/en/im-setup-lark.md) |
-| DingTalk (`dingtalk`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only | [DingTalk](docs/en/im-setup-dingtalk.md) |
+| DingTalk (`dingtalk`) | OAuth redirect | Yes | Yes (ICP domain for public access) | Global: `e2e` 8/8 (ap-northeast-1, ap-southeast-1); **real DingTalk organization + Amazon Quick end to end** (ap-southeast-1). China: synth matrix only | [DingTalk](docs/en/im-setup-dingtalk.md) |
 | WeCom (`wecom`) | QR scan in the container | Yes | Yes (ICP domain for public access) | Global ap-northeast-1: `e2e` 8/8. China: synth matrix only | [WeCom](docs/en/im-setup-wecom.md) |
 
 All 4 IMs × 2 partitions are covered by the synth-matrix unit tests. Real-tenant tests are a manual checklist in [docs/en/testing.md](docs/en/testing.md#3-real-tenant-manual-checklist-g2b). Supported regions: `infra/lib/regions.ts`.

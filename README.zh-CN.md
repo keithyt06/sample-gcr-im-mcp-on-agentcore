@@ -16,9 +16,9 @@
 | 我想要… | 阅读 |
 |---|---|
 | 了解部署前要准备什么 | [部署前提](docs/zh-CN/prerequisites.md) |
-| 创建并配置 IM 应用 | [飞书](docs/zh-CN/im-setup-feishu.md)（含截图）· [Lark](docs/zh-CN/im-setup-lark.md) · [钉钉](docs/zh-CN/im-setup-dingtalk.md) · [企业微信](docs/zh-CN/im-setup-wecom.md) |
+| 创建并配置 IM 应用 | [飞书](docs/zh-CN/im-setup-feishu.md)（含截图）· [Lark](docs/zh-CN/im-setup-lark.md) · [钉钉](docs/zh-CN/im-setup-dingtalk.md)（含截图）· [企业微信](docs/zh-CN/im-setup-wecom.md) |
 | 部署到 AWS Global 或 AWS 中国区 | [部署指南](docs/zh-CN/deploy.md) |
-| **接入 Amazon Quick**（Default OAuth app，带截图的分步教程） | [Amazon Quick connector 教程](docs/zh-CN/client-amazon-quick.md) |
+| **接入 Amazon Quick**（Default OAuth app，带截图的分步教程） | [Amazon Quick connector 教程](docs/zh-CN/client-amazon-quick.md)（飞书截图）· [钉钉实操](docs/zh-CN/quick-walkthrough-dingtalk.md) |
 | 接入 Kiro、Claude Code、Codex 或 Cursor | [连接 MCP 客户端](#连接-mcp-客户端) |
 | 测试部署 | [测试](docs/zh-CN/testing.md) |
 | 了解安全模型 | [安全](docs/zh-CN/security.md) |
@@ -74,7 +74,7 @@ MCP 客户端 --HTTPS--> API Gateway --> oauth Lambda      （登录、token）
 |---|---|---|---|---|---|
 | 飞书（`feishu`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global：`e2e` 8/8（ap-northeast-1、ap-southeast-1）；**真实飞书租户 + Amazon Quick 端到端已跑通**（ap-southeast-1）。中国区 cn-northwest-1：`e2e:internal` 7/7（无 ICP 时公网 URL 返回 403，符合预期） | [飞书](docs/zh-CN/im-setup-feishu.md) |
 | Lark（`lark`） | OAuth 跳转 | 支持 | 支持（访问 Lark 需跨境） | 仅 synth 矩阵 | [Lark](docs/zh-CN/im-setup-lark.md) |
-| 钉钉（`dingtalk`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 | [钉钉](docs/zh-CN/im-setup-dingtalk.md) |
+| 钉钉（`dingtalk`） | OAuth 跳转 | 支持 | 支持（公网访问需备案域名） | Global：`e2e` 8/8（ap-northeast-1、ap-southeast-1）；**真实钉钉组织 + Amazon Quick 端到端已跑通**（ap-southeast-1）。中国区：仅 synth 矩阵 | [钉钉](docs/zh-CN/im-setup-dingtalk.md) |
 | 企业微信（`wecom`） | 容器内扫码 | 支持 | 支持（公网访问需备案域名） | Global ap-northeast-1：`e2e` 8/8。中国区：仅 synth 矩阵 | [企业微信](docs/zh-CN/im-setup-wecom.md) |
 
 4 个 IM × 2 个分区全部由 synth 矩阵单元测试覆盖。真实租户测试是 [docs/zh-CN/testing.md](docs/zh-CN/testing.md#3-真实租户手工检查清单g2b) 中的手工检查清单。受支持区域见 `infra/lib/regions.ts`。

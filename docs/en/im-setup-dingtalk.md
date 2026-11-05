@@ -51,7 +51,9 @@ App → **Credentials & Basic Info**:
    ![Permission Management: enabled permissions](../images/dingtalk/03-permissions.jpg)
 
    Add more (contacts, calendar, docs, ...) as needed. Some require admin approval. You don't need to map every tool to a permission up front: when a call lacks one, the tool result returns `missing_scope` with `required_scopes` and an `authorize_url`.
-2. **Version Management & Release** → create and publish a version. The banner "changes take effect after the version is published" disappears once it is live. Limit the visible range to the users who should use the service.
+2. **Version Management & Release** → create a version: version number (for example `1.0.0`), a description, and **App availability** (all employees, some employees, admins only, or only me). Save and publish. Until then the banner "changes take effect after the version is published" stays, and new permissions or redirect URLs don't apply.
+
+   ![Version details: version number, description, availability](../images/dingtalk/05-publish-version.jpg)
 
 Config key `im.dingtalk.scopes`: OAuth scopes requested at authorization. Default `[openid, corpid]`, the same as the official `dws` CLI. `corpid` puts the token in the organization context; leave it in.
 
@@ -67,13 +69,17 @@ It prompts for the Client Secret (no echo), validates the pair against DingTalk 
 
 Stack output `CallbackUrl` (= `<base>/callback`). `ImConsoleCallbackHint` links to the DingTalk app list.
 
-App → **Security Settings** → **Redirect URL** (labelled "callback domain" in some console versions) → add `CallbackUrl` → save (verify in console — UI may change).
+App → **Security Settings** → **Redirect URL (callback domain)** → paste `CallbackUrl` → **Save**. Leave the IP allowlist empty: the service runs on AgentCore Runtime without a fixed egress IP.
+
+![Security Settings: Redirect URL with the CallbackUrl](../images/dingtalk/04-redirect-url.jpg)
+
+If you change anything on this page or in Permission Management, publish a new version (step 4.2).
 
 Give users the stack output `McpUrl` (= `<base>/mcp`).
 
 ## 7. Connect a client
 
-- **Amazon Quick** (AWS Global): [client-amazon-quick.md](client-amazon-quick.md), with **Default OAuth app**. Only the sign-in page in step 4 is DingTalk's.
+- **Amazon Quick** (AWS Global): follow the [DingTalk walkthrough for Amazon Quick](quick-walkthrough-dingtalk.md) (DingTalk screenshots of every step), or the generic [Amazon Quick tutorial](client-amazon-quick.md). Set **Auth configuration** to **Default OAuth app**; no Client ID is needed.
 - **Kiro / Claude Code / Codex / Cursor**: see the [README](../../README.md#connect-an-mcp-client).
 
 ## Config and secret mapping

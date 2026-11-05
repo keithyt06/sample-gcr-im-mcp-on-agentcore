@@ -6,7 +6,7 @@ Amazon Quick 通过 **Default OAuth app** 接入本服务：Quick 自动发现 O
 
 Amazon Quick 在 AWS 中国区不可用。中国区请使用 Kiro、Claude Code、Codex 或 Cursor（见 [README](../../README.zh-CN.md#连接-mcp-客户端)）。
 
-截图以飞书为例。Lark、钉钉、企业微信的流程相同，只有第 4 步的登录页不同。
+截图以飞书为例。Lark、钉钉、企业微信的流程相同，只有第 4 步的登录页不同。钉钉另有一份带钉钉截图的实操：[quick-walkthrough-dingtalk.md](quick-walkthrough-dingtalk.md)。
 
 ## 准备工作
 
