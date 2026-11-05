@@ -100,6 +100,14 @@ export function signClientId(k: Keys, redirectUris: string[], now = nowSec()): s
   return `c1.${payload}.${sig}`;
 }
 
+/**
+ * Stateless secret for confidential clients (client_secret_post / client_secret_basic):
+ * HMAC of the client_id under the DCR key, so nothing is stored and rotating the root key revokes it.
+ */
+export function clientSecretFor(k: Keys, clientId: string): string {
+  return createHmac('sha256', k.dcr).update(`client-secret:${clientId}`).digest('base64url');
+}
+
 export function verifyClientId(k: Keys, clientId: string): { redirectUris: string[] } | null {
   if (typeof clientId !== 'string' || clientId.length > 16384) return null;
   const parts = clientId.split('.');

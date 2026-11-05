@@ -102,7 +102,7 @@ describe('well-known', () => {
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],
-      token_endpoint_auth_methods_supported: ['none'],
+      token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
       scopes_supported: ['mcp'],
     });
   });
@@ -493,6 +493,63 @@ describe('POST /token', () => {
     const rt2 = String(body(await exchange(second.cid, second.code)).refresh_token);
     await store.disableUser(table.get('ident#feishu#ou_alice')!.userId!.S!);
     expect(body(await tokenReq({ grant_type: 'refresh_token', refresh_token: rt2, client_id: second.cid })).error).toBe('invalid_grant');
+  });
+});
+
+describe('confidential clients (manual registration, e.g. Amazon Quick form)', () => {
+  async function confidential(method: string): Promise<{ cid: string; secret: string }> {
+    const r = await handler(
+      ev('POST', '/register', { body: JSON.stringify({ redirect_uris: [LOOPBACK], token_endpoint_auth_method: method }) }),
+    );
+    expect(r.statusCode).toBe(201);
+    const b = body(r);
+    expect(b.token_endpoint_auth_method).toBe(method);
+    expect(b.client_secret_expires_at).toBe(0);
+    return { cid: String(b.client_id), secret: String(b.client_secret) };
+  }
+  const exchange = (f: Record<string, string>, headers: Record<string, string> = {}) =>
+    handler(
+      ev('POST', '/token', {
+        headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+        body: new URLSearchParams(f).toString(),
+      }),
+    );
+  const basic = (id: string, secret: string) =>
+    `Basic ${Buffer.from(`${encodeURIComponent(id)}:${encodeURIComponent(secret)}`).toString('base64')}`;
+
+  it('public registration returns no secret', async () => {
+    const r = await handler(ev('POST', '/register', { body: JSON.stringify({ redirect_uris: [LOOPBACK] }) }));
+    expect(body(r).client_secret).toBeUndefined();
+    expect(body(r).token_endpoint_auth_method).toBe('none');
+  });
+  it('unknown auth method → invalid_client_metadata', async () => {
+    const r = await handler(ev('POST', '/register', { body: JSON.stringify({ redirect_uris: [LOOPBACK], token_endpoint_auth_method: 'private_key_jwt' }) }));
+    expect(body(r).error).toBe('invalid_client_metadata');
+  });
+  it('client_secret_post: right secret → tokens; refresh also checks it', async () => {
+    const { cid, secret } = await confidential('client_secret_post');
+    const { code } = await fullLogin(cid);
+    const r = await exchange({ grant_type: 'authorization_code', client_id: cid, client_secret: secret, code, redirect_uri: LOOPBACK, code_verifier: VERIFIER });
+    expect(r.statusCode).toBe(200);
+    const rt = String(body(r).refresh_token);
+    expect((await exchange({ grant_type: 'refresh_token', client_id: cid, client_secret: 'wrong', refresh_token: rt })).statusCode).toBe(401);
+    expect((await exchange({ grant_type: 'refresh_token', client_id: cid, client_secret: secret, refresh_token: rt })).statusCode).toBe(200);
+  });
+  it('client_secret_basic: right secret → tokens; wrong secret → 401; mismatched body client_id → 401', async () => {
+    const { cid, secret } = await confidential('client_secret_basic');
+    const { code } = await fullLogin(cid);
+    const f = { grant_type: 'authorization_code', code, redirect_uri: LOOPBACK, code_verifier: VERIFIER };
+    expect((await exchange(f, { Authorization: basic(cid, 'nope') })).statusCode).toBe(401);
+    const other = await registerClient();
+    expect((await exchange({ ...f, client_id: other }, { Authorization: basic(cid, secret) })).statusCode).toBe(401);
+    expect((await exchange(f, { Authorization: basic(cid, secret) })).statusCode).toBe(200);
+  });
+  it('a secret from another client is rejected', async () => {
+    const a = await confidential('client_secret_post');
+    const b = await confidential('client_secret_post');
+    const { code } = await fullLogin(a.cid);
+    const r = await exchange({ grant_type: 'authorization_code', client_id: a.cid, client_secret: b.secret, code, redirect_uri: LOOPBACK, code_verifier: VERIFIER });
+    expect(body(r).error).toBe('invalid_client');
   });
 });
 

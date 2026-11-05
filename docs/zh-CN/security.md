@@ -44,7 +44,7 @@
 | 增量授权 token（在 `authorize_url` 中） | 用单独的密钥做 HMAC 签名，不能当作 access token 使用 | 10 分钟 | 工具结果 |
 | 根密钥 | 64 位随机字符，由 CloudFormation 生成 | 直到 Stack 删除 | Secrets Manager `<slug>/root-key`，Lambda 缓存 5 分钟 |
 
-PKCE（仅 S256）是必需的。重定向 URI 必须是回环地址（`127.0.0.1`、`localhost`、`[::1]`，任意端口）、Amazon Quick 的主机（仅 AWS Global），或 `oauth.extraRedirectHosts` 中的 HTTPS 主机。自定义 URI scheme、锚点和 userinfo 一律拒绝。允许列表在注册时**和** `/authorize` 时都会检查。
+PKCE（仅 S256）是必需的。客户端默认为公共客户端（只用 PKCE）；以 `client_secret_post` / `client_secret_basic` 注册的客户端（用于要求填写 secret 的表单，通过 `npm run register-client`）会获得由根密钥派生的无状态 secret，提交的 secret 必须匹配。重定向 URI 必须是回环地址（`127.0.0.1`、`localhost`、`[::1]`，任意端口）、Amazon Quick 的主机（仅 AWS Global），或 `oauth.extraRedirectHosts` 中的 HTTPS 主机。自定义 URI scheme、锚点和 userinfo 一律拒绝。允许列表在注册时**和** `/authorize` 时都会检查。
 
 ### 撤销的生效时间
 

@@ -1,10 +1,10 @@
 // POST /token: authorization_code (+ PKCE S256) and rotating refresh_token grants (§4.4).
-import { formOrJson, json, type HttpEvent, type HttpResult } from '../shared/http';
+import { formOrJson, header, json, type HttpEvent, type HttpResult } from '../shared/http';
 import { loadKeys } from '../shared/keys';
 import { hashUserId, log } from '../shared/log';
 import { redirectMatches } from '../shared/redirects';
 import { consumeCode, consumeRefresh, getUser, putRefresh, touchUser, userStatus } from '../shared/store';
-import { ACCESS_TTL_SEC, mintAccessToken, newRefreshToken, newState, pkceS256, safeEqual, verifyClientId, type Keys } from '../shared/tokens';
+import { ACCESS_TTL_SEC, clientSecretFor, mintAccessToken, newRefreshToken, newState, pkceS256, safeEqual, verifyClientId, type Keys } from '../shared/tokens';
 
 type OAuthError = 'invalid_request' | 'invalid_client' | 'invalid_grant' | 'unsupported_grant_type';
 
@@ -22,12 +22,41 @@ async function issue(keys: Keys, userId: string, clientId: string, family: strin
   );
 }
 
+/** RFC 6749 §2.3.1: client_secret_basic. Values are form-urlencoded inside the Basic credentials. */
+function basicCredentials(event: HttpEvent): { id: string; secret: string } | undefined {
+  const h = header(event, 'authorization');
+  const m = h?.match(/^Basic\s+([A-Za-z0-9+/=]+)$/i);
+  if (!m) return undefined;
+  const raw = Buffer.from(m[1], 'base64').toString('utf8');
+  const i = raw.indexOf(':');
+  if (i < 0) return undefined;
+  try {
+    return { id: decodeURIComponent(raw.slice(0, i).replace(/\+/g, ' ')), secret: decodeURIComponent(raw.slice(i + 1).replace(/\+/g, ' ')) };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Public clients send no secret. A presented secret (post or basic) must match, otherwise invalid_client. */
+function authenticateClient(keys: Keys, f: Record<string, string>, event: HttpEvent): boolean {
+  const basic = basicCredentials(event);
+  if (basic) {
+    if (f.client_id && f.client_id !== basic.id) return false;
+    f.client_id = basic.id;
+  }
+  if (!f.client_id || !verifyClientId(keys, f.client_id)) return false;
+  const secret = basic?.secret ?? f.client_secret;
+  return secret === undefined || secret === '' || safeEqual(secret, clientSecretFor(keys, f.client_id));
+}
+
 export async function token(event: HttpEvent): Promise<HttpResult> {
   const f = formOrJson(event);
   const keys = await loadKeys();
+  if ((f.grant_type === 'authorization_code' || f.grant_type === 'refresh_token') && !authenticateClient(keys, f, event)) {
+    return err('invalid_client', 'unknown client_id or bad client_secret');
+  }
 
   if (f.grant_type === 'authorization_code') {
-    if (!f.client_id || !verifyClientId(keys, f.client_id)) return err('invalid_client', 'unknown client_id');
     if (!f.code || !f.redirect_uri) return err('invalid_request', 'code and redirect_uri are required');
     if (!f.code_verifier || !/^[A-Za-z0-9._~-]{43,128}$/.test(f.code_verifier)) return err('invalid_request', 'code_verifier must be 43-128 chars');
     const rec = await consumeCode(f.code);
@@ -44,7 +73,6 @@ export async function token(event: HttpEvent): Promise<HttpResult> {
 
   if (f.grant_type === 'refresh_token') {
     if (!f.refresh_token || !f.refresh_token.startsWith('r1.')) return err('invalid_grant', 'invalid refresh_token');
-    if (!f.client_id || !verifyClientId(keys, f.client_id)) return err('invalid_client', 'unknown client_id');
     const r = await consumeRefresh(f.refresh_token);
     if (!r.ok) {
       if (r.reason === 'replay') log('CRITICAL', 'refresh_token_reuse_detected', { note: 'token family revoked' });

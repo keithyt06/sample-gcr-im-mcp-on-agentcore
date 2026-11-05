@@ -26,9 +26,31 @@ The server is its own OAuth 2.1 authorization server and supports **Dynamic Clie
 3. Quick registers itself at `<base>/register` (DCR). Its callback host `*.quicksight.aws.amazon.com` is allowed automatically in AWS Global regions.
 4. When a user connects, Quick opens `<base>/authorize`, which forwards to the IM sign-in (Feishu/Lark/DingTalk OAuth, or the WeCom QR page). The user signs in **as themselves**.
 
-You do **not** need to type a Client ID, Client Secret, Token URL, or Authorization URL. Because DCR is supported, Quick does not ask for them.
+Some Quick consoles still show a form that **requires** Client ID, Client secret, Token URL and Authorization URL. In that case, register a client once with the helper script (step 0) and paste its values. The server supports both public clients and confidential clients (`client_secret_post` / `client_secret_basic`); PKCE is always required.
 
 ## Steps
+
+0. **If the form asks for Client ID / secret** (recommended to do once anyway), register a client:
+
+   ```bash
+   npm run register-client -- -c config=config/deploy.yaml
+   ```
+
+   It prints every field of the form:
+
+   ```
+   MCP server endpoint      https://<base>/mcp
+   Client ID                c1.eyJ...
+   Client secret            <secret>
+   Token URL                https://<base>/token
+   Authorization URL        https://<base>/authorize
+   Redirect URL (allowed)   https://<region>.quicksight.aws.amazon.com/sn/oauthcallback
+                            https://us-east-1.quicksight.aws.amazon.com/sn/oauthcallback
+   ```
+
+   - By default it allows the Quick callback in the stack's region and in `us-east-1`. Compare with the **Redirect URL** that Quick shows (read-only field). If it differs, re-run with `--redirect-uri <the URL Quick shows>` (repeatable, up to 5).
+   - `--public` registers a public client instead: tick **Public OAuth client** in Quick and leave Client secret empty.
+   - The client secret is a credential. It is derived from the stack's root key, so nothing is stored; rotating the root key revokes every client.
 
 1. In the Amazon Quick console, open **Connectors** → **Create for your team** → **Model Context Protocol (MCP)**.
 2. On **Create Integration**:
@@ -37,7 +59,7 @@ You do **not** need to type a Client ID, Client Secret, Token URL, or Authorizat
    - **MCP server endpoint**: the `McpUrl` value.
    - **Connection type**: **Public network**.
    - **Auth server connection type**: **Public network**.
-3. Choose **Next**. Choose **User authentication (OAuth)**. Quick registers itself through DCR.
+3. Choose **Next**. Choose **User authentication (OAuth)**. If Quick shows the Client ID / Client secret / Token URL / Authorization URL fields, paste the values from step 0 (leave **Public OAuth client** unticked unless you used `--public`). Otherwise Quick registers itself through DCR.
 4. Choose **Create and continue**. Quick opens the sign-in page. Sign in with your IM account and approve the requested permissions.
 5. Review the discovered tools (actions) and choose **Next**. Share the integration with other users if needed. Each user who uses it signs in with their own IM account.
 
@@ -55,6 +77,8 @@ You do **not** need to type a Client ID, Client Secret, Token URL, or Authorizat
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Token exchange fails with `invalid_client` | Client secret mistyped, or the client was registered against another stack (different root key) | Re-run `npm run register-client` for this stack and paste again |
+| Sign-in page says `redirect_uri is not allowed` / not registered | Quick's Redirect URL is not in the client's list | Re-run `npm run register-client -- --redirect-uri <Quick's Redirect URL>` |
 | Quick reports it can't register a client | Redirect host not allowed (for example, a Quick domain outside `*.quicksight.aws.amazon.com`) | Add the host to `oauth.extraRedirectHosts` and redeploy |
 | IM sign-in page shows a redirect error (Feishu error **20029**) | `CallbackUrl` not registered in the IM console | Register it (see the IM setup guide) |
 | Sign-in works, then every tool returns `im_app_not_configured` | The IM app secret was never stored | `npm run secret:set-im-app` |

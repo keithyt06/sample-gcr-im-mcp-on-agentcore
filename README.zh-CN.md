@@ -153,7 +153,7 @@ url = "https://<your-base>/mcp"
 
 **Cursor** 以及其他支持带 OAuth 的远程 MCP 服务器的客户端：把同一个 URL 添加为 streamable HTTP 服务器。
 
-**Amazon Quick（仅 AWS Global）**：添加 MCP 集成，服务器 URL 填 `https://<your-base>/mcp`，认证方式选择支持动态客户端注册的 OAuth（以控制台为准，界面可能变化）。在 AWS Global 区域，Quick 的回调主机会被自动允许。详细步骤见 [docs/zh-CN/client-amazon-quick.md](docs/zh-CN/client-amazon-quick.md)。
+**Amazon Quick（仅 AWS Global）**：添加 MCP 集成，服务器 URL 填 `https://<your-base>/mcp`，认证方式选择支持动态客户端注册的 OAuth（以控制台为准，界面可能变化）。在 AWS Global 区域，Quick 的回调主机会被自动允许。如果 Quick 表单要求填写 Client ID / Client secret / Token URL / Authorization URL，执行 `npm run register-client` 并粘贴输出。详细步骤见 [docs/zh-CN/client-amazon-quick.md](docs/zh-CN/client-amazon-quick.md)。
 
 服务器名称请使用你部署的 IM 名（`feishu`、`lark`、`dingtalk`、`wecom`）。工具名以它为前缀，例如 `feishu_im_messages_send`、`dingtalk_calendar_event_list`、`wecom_doc_search`。
 

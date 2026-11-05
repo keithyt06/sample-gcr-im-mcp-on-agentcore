@@ -153,7 +153,7 @@ Then run `codex mcp login feishu` to authenticate.
 
 **Cursor** and other clients that support remote MCP servers with OAuth: add the same URL as a streamable HTTP server.
 
-**Amazon Quick (AWS Global only)**: add an MCP integration with the server URL `https://<your-base>/mcp` and OAuth with dynamic client registration (verify in console — UI may change). The Quick callback hosts are allowed automatically in AWS Global regions. Step-by-step: [docs/en/client-amazon-quick.md](docs/en/client-amazon-quick.md).
+**Amazon Quick (AWS Global only)**: add an MCP integration with the server URL `https://<your-base>/mcp` and OAuth with dynamic client registration (verify in console — UI may change). The Quick callback hosts are allowed automatically in AWS Global regions. If the Quick form requires Client ID / Client secret / Token URL / Authorization URL, run `npm run register-client` and paste its output. Step-by-step: [docs/en/client-amazon-quick.md](docs/en/client-amazon-quick.md).
 
 Use the IM name you deployed (`feishu`, `lark`, `dingtalk`, `wecom`) as the server name. Tool names are prefixed with it, for example `feishu_im_messages_send`, `dingtalk_calendar_event_list`, `wecom_doc_search`.
 
